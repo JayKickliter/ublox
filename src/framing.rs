@@ -75,6 +75,7 @@ impl Deframer {
     ///
     /// [`Frame`]: struct.Frame.html
     /// [`Error`]: enum.Error.html
+    #[inline]
     pub fn push(&mut self, input: u8) -> Result<Option<Frame>, FrameError> {
         use self::Deframer::*;
         match self {
