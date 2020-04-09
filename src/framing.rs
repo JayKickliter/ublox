@@ -75,7 +75,7 @@ impl Deframer {
     ///
     /// [`Frame`]: struct.Frame.html
     /// [`Error`]: enum.Error.html
-    pub fn push(&mut self, input: u8) -> Result<Option<Frame>, Error> {
+    pub fn push(&mut self, input: u8) -> Result<Option<Frame>, FrameError> {
         use self::Deframer::*;
         match self {
             Sync(accum) => {
@@ -160,7 +160,7 @@ impl Deframer {
                         payload: pay,
                         cksum_calc: *cksum_calc,
                     };
-                    return Err(Error::Crc);
+                    return Err(FrameError::Crc);
                 } else {
                     *self = Self::default();
                 }
@@ -181,7 +181,7 @@ impl Deframer {
                         payload: pay,
                     }))
                 } else {
-                    Err(Error::Crc)
+                    Err(FrameError::Crc)
                 };
                 *self = Self::default();
                 return ret;
@@ -256,7 +256,7 @@ impl Checksum {
 ///
 /// [`Deframer::push()`]: enum.Deframer.html#method.push
 #[derive(Debug)]
-pub enum Error {
+pub enum FrameError {
     /// The payload length parsed out of message is larger than we can
     /// store.
     #[cfg(not(feature = "std"))]
