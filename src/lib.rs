@@ -3,10 +3,6 @@
 
 //! A collection of types and parsers for u-blox v8 messages.
 
-extern crate byteorder;
-#[macro_use]
-extern crate nom;
-
 pub mod coding;
 pub mod framing;
 pub mod nav;

@@ -2,7 +2,7 @@
 name = "ublox-msg"
 version = "0.1.0"
 authors = ["Jay Kickliter <jay@kickliter.com>"]
-edition = "2015"
+edition = "2018"
 
 [dependencies]
 nom = "4"
