@@ -191,6 +191,11 @@ impl Deframer {
 
         Ok(None)
     }
+
+    /// Returns a new deframer.
+    pub fn new() -> Self {
+        Deframer::Sync(0)
+    }
 }
 
 /// The type returned by [`Deframer::push()`] upon successfully parsing
@@ -216,7 +221,7 @@ pub struct Frame {
 
 impl Default for Deframer {
     fn default() -> Self {
-        Deframer::Sync(0)
+        Self::new()
     }
 }
 
