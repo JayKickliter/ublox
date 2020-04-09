@@ -161,7 +161,7 @@ impl Deframer {
                         payload: pay,
                         cksum_calc: *cksum_calc,
                     };
-                    return Err(FrameError::Crc);
+                    return Err(FrameError::Checksum);
                 } else {
                     *self = Self::default();
                 }
@@ -182,7 +182,7 @@ impl Deframer {
                         payload: pay,
                     }))
                 } else {
-                    Err(FrameError::Crc)
+                    Err(FrameError::Checksum)
                 };
                 *self = Self::default();
                 return ret;
@@ -234,7 +234,7 @@ impl Checksum {
     /// Returns self initialized with the first byte.
     ///
     /// As this initializes `self`, you must not call `push()` with
-    /// this same byte again, else the calculated CRC will be
+    /// this same byte again, else the calculated checksum will be
     /// incorrect.
     pub fn with(input: u8) -> Self {
         let mut s = Self::default();
@@ -273,10 +273,10 @@ pub enum FrameError {
         capacity: usize,
     },
 
-    /// CRC mismatch.
+    /// Checksum mismatch.
     ///
-    /// Note that declared or calaculated CRCs are *not* included with
+    /// Note that declared or calaculated checksums are *not* included with
     /// the error. This is because the defamer may return this error
-    /// after receiving only the first declared CRC byte.
-    Crc,
+    /// after receiving only the first declared checksum byte.
+    Checksum,
 }
