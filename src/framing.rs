@@ -116,15 +116,8 @@ impl Deframer {
                 len_b0,
                 cksum,
             } => {
-                let payload = DeframeVec::new();
                 let len = (usize::from(cksum.push(input)) << 8) | usize::from(*len_b0);
-                if len > payload.capacity() {
-                    *self = Self::default();
-                    return Err(Error::Size {
-                        declared: len,
-                        capacity: payload.capacity(),
-                    });
-                }
+                let payload = DeframeVec::with_capacity(len);
                 *self = Payload {
                     class: *class,
                     id: *id,
@@ -158,15 +151,18 @@ impl Deframer {
                 payload,
                 cksum_calc,
             } => {
-                *self = if input == cksum_calc.0 {
-                    CkB {
+                if input == cksum_calc.0 {
+                    let mut pay = Vec::new();
+                    ::std::mem::swap(payload, &mut pay);
+                    *self = CkB {
                         class: *class,
                         id: *id,
-                        payload: payload.clone(),
+                        payload: pay,
                         cksum_calc: *cksum_calc,
-                    }
+                    };
+                    return Err(Error::Crc);
                 } else {
-                    Self::default()
+                    *self = Self::default();
                 }
             }
 
@@ -176,19 +172,19 @@ impl Deframer {
                 payload,
                 cksum_calc,
             } => {
-                let ret;
-
-                if input == cksum_calc.1 {
-                    ret = Some(Frame {
+                let mut pay = Vec::new();
+                ::std::mem::swap(payload, &mut pay);
+                let ret = if input == cksum_calc.1 {
+                    Ok(Some(Frame {
                         class: *class,
                         id: *id,
-                        payload: payload.clone(),
-                    })
+                        payload: pay,
+                    }))
                 } else {
-                    ret = None
+                    Err(Error::Crc)
                 };
                 *self = Self::default();
-                return Ok(ret);
+                return ret;
             }
         };
 
@@ -263,10 +259,18 @@ impl Checksum {
 pub enum Error {
     /// The payload length parsed out of message is larger than we can
     /// store.
+    #[cfg(not(feature = "std"))]
     Size {
         /// Declared message length parsed from byte stream.
         declared: usize,
         /// Payload buffer's capacity.
         capacity: usize,
     },
+
+    /// CRC mismatch.
+    ///
+    /// Note that declared or calaculated CRCs are *not* included with
+    /// the error. This is because the defamer may return this error
+    /// after receiving only the first declared CRC byte.
+    Crc,
 }
