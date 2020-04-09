@@ -1,5 +1,8 @@
 //! u-blox protocol framing and deframing state machines.
 
+#[cfg(not(feature = "std"))]
+use heapless;
+
 /// TODO: add `std` feature and use `heapless::Vec<u8,
 /// heapless::consts::U128>` when not `std` feature is not enabled.
 type DeframeVec = Vec<u8>;

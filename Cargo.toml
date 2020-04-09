@@ -4,6 +4,13 @@ version = "0.1.0"
 authors = ["Jay Kickliter <jay@kickliter.com>"]
 edition = "2015"
 
+[features]
+default = ["std"]
+std = []
+
+[dev.'cfg(not(feature = "std"))'.dependencies]
+heapless = "*"
+
 [dependencies]
 nom = "4"
 

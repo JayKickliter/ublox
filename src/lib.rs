@@ -7,6 +7,9 @@ extern crate byteorder;
 #[macro_use]
 extern crate nom;
 
+#[cfg(not(feature = "std"))]
+extern crate heapless;
+
 pub mod coding;
 pub mod framing;
 pub mod nav;
