@@ -161,9 +161,9 @@ impl Deframer {
                         payload: pay,
                         cksum_calc: *cksum_calc,
                     };
-                    return Err(FrameError::Checksum);
                 } else {
                     *self = Self::default();
+                    return Err(FrameError::Checksum);
                 }
             }
 
@@ -279,4 +279,20 @@ pub enum FrameError {
     /// the error. This is because the defamer may return this error
     /// after receiving only the first declared checksum byte.
     Checksum,
+}
+
+#[cfg(test)]
+mod test {
+    use super::Deframer;
+
+    #[test]
+    fn test_deframe() {
+        let msg = [0xb5, 0x62, 0x05, 0x01, 0x01, 0x00, 0x06, 0x0d, 0x26];
+        let mut deframer = Deframer::new();
+        let mut res = None;
+        for b in msg.as_ref() {
+            res = deframer.push(*b).unwrap();
+        }
+        assert!(res.is_some());
+    }
 }
