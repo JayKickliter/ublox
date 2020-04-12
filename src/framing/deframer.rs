@@ -1,6 +1,6 @@
 //! u-blox protocol framing and deframing state machines.
 
-use crate::framing::{Checksum, FrameVec, Frame, FrameError};
+use crate::framing::{Checksum, Frame, FrameError, FrameVec};
 
 /// One-shot defamer utility function.
 pub fn deframe<T>(bytes: T) -> Result<Option<Frame>, FrameError>

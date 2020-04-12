@@ -1,9 +1,33 @@
 /// A type used for incrementally calculating u-blox protocol message
 /// checksums.
+///
+/// # Specification
+///
+/// From UBX-13003221-R18:
+///
+/// > The checksum algorithm used is the 8-Bit Fletcher Algorithm,
+/// which is used in the TCP standard (RFC 1145)
+///
+/// # Example
+///
+/// ```
+/// # use ublox::framing::Checksum;
+/// let bytes = [1, 2, 3, 4];
+/// let mut cksum = Checksum::new();
+/// for b in &bytes {
+///     cksum.push(*b);
+/// }
+/// let (ck_a, ck_b) = cksum.take();
+/// ```
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Checksum(Option<(u8, u8)>);
 
 impl Checksum {
+    /// Returns a new instance of `Self`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Returns self initialized with the first byte.
     ///
     /// As this initializes `self`, you must not call `push()` with
