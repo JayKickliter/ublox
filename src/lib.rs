@@ -5,5 +5,5 @@
 
 pub mod coding;
 pub mod framing;
-pub mod nav;
+pub mod messages;
 pub mod primitive;
