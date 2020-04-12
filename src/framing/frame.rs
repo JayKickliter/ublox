@@ -13,12 +13,12 @@ pub struct Frame {
     /// Message ID's are not globally unique, but they are unique per
     /// `class`.
     pub id: u8,
-    /// The message's payload.
+    /// The message's message.
     ///
-    /// `payload` is just a buffer of bytes and can be dispatched to
+    /// `message` is just a buffer of bytes and can be dispatched to
     /// an appropriate message-specific parser based on `class` and
     /// `id`.
-    pub payload: FrameVec,
+    pub message: FrameVec,
 }
 
 impl Frame {
@@ -27,28 +27,28 @@ impl Frame {
         let Frame {
             class,
             id,
-            mut payload,
+            mut message,
         } = self;
         // Prepend frame data to message by first appending it, then
         // rotating it to the front.
         {
-            let [len_lsb, len_msb] = (payload.len() as u16).to_le_bytes();
+            let [len_lsb, len_msb] = (message.len() as u16).to_le_bytes();
             let prefix = [0xB5, 0x62, class, id, len_lsb, len_msb];
-            payload.extend_from_slice(&prefix);
-            payload.rotate_right(prefix.len());
+            message.extend_from_slice(&prefix);
+            message.rotate_right(prefix.len());
         }
         // Append checksum.
         {
             let mut cksm = Checksum::default();
-            // The checksum is calculated from class to end of payload, hence
+            // The checksum is calculated from class to end of message, hence
             // `skip(2)`
-            for b in payload.iter().skip(2) {
+            for b in message.iter().skip(2) {
                 cksm.push(*b);
             }
             let (ck_a, ck_b) = cksm.take();
-            payload.push(ck_a);
-            payload.push(ck_b);
+            message.push(ck_a);
+            message.push(ck_b);
         }
-        payload
+        message
     }
 }

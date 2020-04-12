@@ -70,29 +70,29 @@ impl Deframer {
                 cksum,
             } => {
                 let len = (usize::from(cksum.push(input)) << 8) | usize::from(*len_b0);
-                let payload = FrameVec::with_capacity(len);
-                *self = Payload {
+                let message = FrameVec::with_capacity(len);
+                *self = Message {
                     class: *class,
                     id: *id,
                     len,
-                    payload,
+                    message,
                     cksum: *cksum,
                 }
             }
 
-            Payload {
+            Message {
                 class,
                 id,
                 len,
-                payload,
+                message,
                 cksum,
             } => {
-                payload.push(cksum.push(input));
-                if payload.len() == *len {
+                message.push(cksum.push(input));
+                if message.len() == *len {
                     *self = CkA {
                         class: *class,
                         id: *id,
-                        payload: payload.clone(),
+                        message: message.clone(),
                         cksum_calc: cksum.take(),
                     };
                 }
@@ -101,16 +101,16 @@ impl Deframer {
             CkA {
                 class,
                 id,
-                payload,
+                message,
                 cksum_calc,
             } => {
                 if input == cksum_calc.0 {
-                    let mut pay = Vec::new();
-                    ::std::mem::swap(payload, &mut pay);
+                    let mut msg = Vec::new();
+                    ::std::mem::swap(message, &mut msg);
                     *self = CkB {
                         class: *class,
                         id: *id,
-                        payload: pay,
+                        message: msg,
                         cksum_calc: *cksum_calc,
                     };
                 } else {
@@ -122,16 +122,16 @@ impl Deframer {
             CkB {
                 class,
                 id,
-                payload,
+                message,
                 cksum_calc,
             } => {
-                let mut pay = Vec::new();
-                ::std::mem::swap(payload, &mut pay);
+                let mut msg = Vec::new();
+                ::std::mem::swap(message, &mut msg);
                 let ret = if input == cksum_calc.1 {
                     Ok(Some(Frame {
                         class: *class,
                         id: *id,
-                        payload: pay,
+                        message: msg,
                     }))
                 } else {
                     Err(FrameError::Checksum)
@@ -185,13 +185,13 @@ pub enum Deframer {
         cksum: Checksum,
     },
 
-    /// Push rx bytes into payload until `payload.len() == len`.
+    /// Push rx bytes into message until `message.len() == len`.
     #[doc(hidden)]
-    Payload {
+    Message {
         class: u8,
         id: u8,
         len: usize,
-        payload: FrameVec,
+        message: FrameVec,
         cksum: Checksum,
     },
 
@@ -201,7 +201,7 @@ pub enum Deframer {
     CkA {
         class: u8,
         id: u8,
-        payload: FrameVec,
+        message: FrameVec,
         cksum_calc: (u8, u8),
     },
 
@@ -211,7 +211,7 @@ pub enum Deframer {
     CkB {
         class: u8,
         id: u8,
-        payload: FrameVec,
+        message: FrameVec,
         cksum_calc: (u8, u8),
     },
 }

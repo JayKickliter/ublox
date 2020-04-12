@@ -32,7 +32,7 @@ impl Nav {
         };
 
         match frame.id {
-            TimeGps::ID => Ok(Self::TimeGps(time_gps(&frame.payload).map_err(|_| ())?.1)),
+            TimeGps::ID => Ok(Self::TimeGps(time_gps(&frame.message).map_err(|_| ())?.1)),
             _ => Err(()),
         }
     }
