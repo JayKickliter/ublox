@@ -2,6 +2,7 @@
 
 mod timegps;
 pub use self::timegps::*;
+use crate::framing::Frame;
 use nom::{alt, do_parse, named_attr, tag};
 
 /// Navigation Results Messages
@@ -15,9 +16,26 @@ use nom::{alt, do_parse, named_attr, tag};
 /// - DOP
 /// - SVs used
 #[allow(missing_docs)]
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Nav {
     TimeGps(TimeGps),
+}
+
+impl Nav {
+    /// NAV class.
+    pub const CLASS: u8 = 0x01;
+
+    /// Parses a navigation message from a [`Frame`].
+    pub fn from_frame(frame: &Frame) -> Result<Self, ()> {
+        if frame.class != Self::CLASS {
+            return Err(());
+        };
+
+        match frame.id {
+            TimeGps::ID => Ok(Self::TimeGps(time_gps(&frame.payload).map_err(|_| ())?.1)),
+            _ => Err(()),
+        }
+    }
 }
 
 named_attr!(
