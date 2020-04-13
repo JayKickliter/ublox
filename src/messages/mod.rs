@@ -15,7 +15,7 @@ impl Msg {
     /// Parses a u-blox message from a [`Frame`].
     pub fn from_frame(frame: &Frame) -> Result<Self, ()> {
         match frame.class {
-            nav::Nav::CLASS => Ok(Self::Nav(Nav::from_frame(frame)?)),
+            nav::Nav::CLASS => Ok(Msg::Nav(Nav::from_frame(frame)?)),
             _ => Err(()),
         }
     }

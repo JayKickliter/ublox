@@ -36,11 +36,11 @@ impl Nav {
         };
 
         match (frame.class, frame.id, frame.message.len()) {
-            (TimeGps::CLASS, TimeGps::ID, TimeGps::LEN) => Ok(Self::TimeGps(
+            (TimeGps::CLASS, TimeGps::ID, TimeGps::LEN) => Ok(Nav::TimeGps(
                 TimeGps::parse(&frame.message).map_err(|_| ())?.1,
             )),
             (Pvt::CLASS, Pvt::ID, Pvt::LEN) => {
-                Ok(Self::Pvt(Pvt::parse(&frame.message).map_err(|_| ())?.1))
+                Ok(Nav::Pvt(Pvt::parse(&frame.message).map_err(|_| ())?.1))
             }
             _ => Err(()),
         }
