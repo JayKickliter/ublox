@@ -1,4 +1,4 @@
-use crate::messages::primitive::*;
+use crate::messages::{primitive::*, Message};
 use nom::{do_parse, le_i16, le_i32, le_u16, le_u32, le_u8, named_attr, take};
 
 /// This message combines position, velocity and time solution,
@@ -205,10 +205,13 @@ pub struct Pvt {
     macAcc: U2,
 }
 
-impl Pvt {
-    /// NAV-PVT ID.
-    pub const ID: u8 = 0x07;
+impl Message for Pvt {
+    const CLASS: u8 = 0x01;
+    const ID: u8 = 0x07;
+    const LEN: usize = 92;
+}
 
+impl Pvt {
     named_attr!(
         #[doc = "Parses `Self` from provided buffer."],
         pub parse<&[u8], Pvt>,

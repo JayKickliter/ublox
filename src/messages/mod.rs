@@ -20,3 +20,13 @@ impl Msg {
         }
     }
 }
+
+/// Represents any u-blox protocol message.
+pub trait Message {
+    /// Message Class.
+    const CLASS: u8;
+    /// Message ID.
+    const ID: u8;
+    /// Message length.
+    const LEN: usize;
+}

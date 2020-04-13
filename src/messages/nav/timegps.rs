@@ -1,4 +1,4 @@
-use crate::messages::primitive::*;
+use crate::messages::{Message, primitive::*};
 use nom::{do_parse, le_i16, le_i32, le_i8, le_u32, le_u8, named_attr};
 
 /// This message reports the precise GPS time of the most recent
@@ -43,10 +43,13 @@ pub struct TimeGps {
     pub tAcc: U4,
 }
 
-impl TimeGps {
-    /// NAV-TIMEGPS ID.
-    pub const ID: u8 = 0x20;
+impl Message for TimeGps {
+    const CLASS: u8 = 0x01;
+    const ID: u8 = 0x20;
+    const LEN: usize = 16;
+}
 
+impl TimeGps {
     named_attr!(
         #[doc = "Parses `Self` from provided buffer."],
         pub parse<&[u8], TimeGps>,
