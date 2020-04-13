@@ -1,0 +1,10 @@
+[package]
+name = "ubsniff"
+version = "0.1.0"
+authors = ["Jay Kickliter <jay@kickliter.com>"]
+edition = "2018"
+
+[dependencies]
+serialport = { version = "3", default-features = false }
+structopt = "0.3"
+ublox = { path = ".." }

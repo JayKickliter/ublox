@@ -4,6 +4,10 @@ version = "0.1.0"
 authors = ["Jay Kickliter <jay@kickliter.com>"]
 edition = "2018"
 
+[workspace]
+members = [ "ubsniff" ]
+default-members = [ "ubsniff" ]
+
 [dependencies]
 nom = "4"
 
