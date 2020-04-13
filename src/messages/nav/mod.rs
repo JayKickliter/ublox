@@ -32,7 +32,9 @@ impl Nav {
         };
 
         match frame.id {
-            TimeGps::ID => Ok(Self::TimeGps(time_gps(&frame.message).map_err(|_| ())?.1)),
+            TimeGps::ID => Ok(Self::TimeGps(
+                TimeGps::parse(&frame.message).map_err(|_| ())?.1,
+            )),
             _ => Err(()),
         }
     }
@@ -43,7 +45,7 @@ named_attr!(
     pub navmsg<&[u8], Nav>,
     do_parse!(tag!([0x01]) >>
               navmsg: alt!(
-                  time_gps => { | msg | Nav::TimeGps(msg) }
+                  TimeGps::parse => { | msg | Nav::TimeGps(msg) }
               ) >>
               (navmsg)
     )

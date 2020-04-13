@@ -1,5 +1,6 @@
 //! u-blox message types.
 pub mod nav;
+pub mod primitive;
 use crate::framing::Frame;
 use nav::Nav;
 

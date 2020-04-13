@@ -3,7 +3,5 @@
 
 //! A collection of types and parsers for u-blox v8 messages.
 
-pub mod coding;
 pub mod framing;
 pub mod messages;
-pub mod primitive;
