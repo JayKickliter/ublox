@@ -1,6 +1,8 @@
 //! Navigation messages.
 
+mod pvt;
 mod timegps;
+pub use self::pvt::*;
 pub use self::timegps::*;
 use crate::framing::Frame;
 use nom::{alt, do_parse, named_attr, tag};
