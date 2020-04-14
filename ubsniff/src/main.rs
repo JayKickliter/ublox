@@ -1,26 +1,31 @@
 mod cmdline;
 use cmdline::Cmdline;
+#[cfg(target_os = "linux")]
+use std::fmt::Debug;
 use std::{
     error::Error,
     ffi::OsStr,
     fs::File,
-    io::{ErrorKind, Read},
+    io::{BufReader, ErrorKind, Read},
     path::Path,
     time::Duration,
 };
 use structopt::StructOpt;
 use ublox::{framing::Deframer, messages::Msg};
 
-fn main() -> Result<(), Box<dyn Error>> {
+type Result<T = ()> = ::std::result::Result<T, Box<dyn Error>>;
+
+fn main() -> Result {
     let cmdline = Cmdline::from_args();
     match cmdline {
         Cmdline::File { path } => file_loop(&path),
+        #[cfg(target_os = "linux")]
         Cmdline::I2c { path, addr } => i2c_loop(&path, addr),
         Cmdline::Serial { path, baud } => uart_loop(&path, baud),
     }
 }
 
-fn file_loop(path: &Path) -> Result<(), Box<dyn Error>> {
+fn file_loop(path: &Path) -> Result {
     let file = File::open(path)?;
 
     let mut deframer = Deframer::new();
@@ -37,9 +42,10 @@ fn file_loop(path: &Path) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn uart_loop<P: AsRef<OsStr>>(path: &P, baud: u32) -> Result<(), Box<dyn Error>> {
+fn uart_loop<P: AsRef<OsStr>>(path: &P, baud: u32) -> Result {
     use serialport::prelude::*;
-    let mut port = serialport::open_with_settings(
+
+    let port = BufReader::new(serialport::open_with_settings(
         path,
         &SerialPortSettings {
             baud_rate: baud,
@@ -47,32 +53,212 @@ fn uart_loop<P: AsRef<OsStr>>(path: &P, baud: u32) -> Result<(), Box<dyn Error>>
             flow_control: FlowControl::None,
             parity: Parity::None,
             stop_bits: StopBits::One,
-            timeout: Duration::from_millis(1),
+            timeout: Duration::from_millis(50),
         },
-    )?;
+    )?);
 
     let mut deframer = Deframer::new();
-    let mut buf = [0u8; 256];
-    loop {
-        match port.read(buf.as_mut()) {
+
+    for b in port.bytes() {
+        match b {
             Err(ref e) if e.kind() == ErrorKind::TimedOut => (),
             Err(e) => eprintln!("{:?}", e),
-            Ok(n_read) => {
-                for &b in &buf[..n_read] {
-                    match deframer.push(b) {
-                        Err(e) => eprintln!("deframe error {:?}", e),
-                        Ok(None) => (),
-                        Ok(Some(frame)) => match Msg::from_frame(&frame) {
-                            Err(_) => eprintln!("unhandled frame: {:?}", frame),
-                            Ok(msg) => println!("{:#?}", msg),
-                        },
-                    }
-                }
-            }
-        };
+            Ok(b) => match deframer.push(b) {
+                Err(e) => eprintln!("deframe error {:?}", e),
+                Ok(None) => (),
+                Ok(Some(frame)) => match Msg::from_frame(&frame) {
+                    Err(_) => eprintln!("unhandled frame: {:?}", frame),
+                    Ok(msg) => println!("{:#?}", msg),
+                },
+            },
+        }
     }
+    Ok(())
 }
 
-fn i2c_loop<P: AsRef<OsStr>>(_path: &P, _addr: u8) -> Result<(), Box<dyn Error>> {
-    unimplemented!()
+#[cfg(target_os = "linux")]
+fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
+    use i2c_linux::{I2c, Message as I2cMessage, ReadFlags, WriteFlags};
+    use std::thread;
+    use ublox::{
+        framing::Frame,
+        messages::{nav, Message},
+    };
+
+    let mut dev = I2c::from_path(path)?;
+    let mut deframer = Deframer::new();
+    let mut scratch = [0u8; 128];
+
+    fn available(dev: &mut I2c<File>, addr: u16) -> Result<usize> {
+        const UBX_BYTES_AVAIL_REG: u8 = 0xFD;
+        let mut available = [0; 2];
+        let mut msgs = [
+            I2cMessage::Write {
+                address: addr,
+                data: &[UBX_BYTES_AVAIL_REG],
+                flags: WriteFlags::default(),
+            },
+            I2cMessage::Read {
+                address: addr,
+                data: &mut available,
+                flags: ReadFlags::default(),
+            },
+        ];
+        dev.i2c_transfer(&mut msgs)?;
+        Ok(u16::from_be_bytes(available).into())
+    };
+
+    fn read(dev: &mut I2c<File>, addr: u16, dst: &mut [u8]) -> Result {
+        const UBX_WRITE_REG: u8 = 0xFF;
+        let dst_len = dst.len();
+        let mut msgs = [
+            I2cMessage::Write {
+                address: addr,
+                data: &[UBX_WRITE_REG],
+                flags: WriteFlags::default(),
+            },
+            I2cMessage::Read {
+                address: addr,
+                data: dst,
+                flags: ReadFlags::default(),
+            },
+        ];
+        dev.i2c_transfer(&mut msgs)?;
+        if let I2cMessage::Read { data: read, .. } = &msgs[1] {
+            assert_eq!(read.len(), dst_len);
+        }
+        Ok(())
+    }
+
+    fn write(dev: &mut I2c<File>, addr: u16, src: &[u8]) -> Result {
+        const UBX_WRITE_REG: u8 = 0xFF;
+        let mut msgs = [
+            I2cMessage::Write {
+                address: addr,
+                data: &[UBX_WRITE_REG],
+                flags: WriteFlags::default(),
+            },
+            I2cMessage::Write {
+                address: addr,
+                data: &src,
+                flags: WriteFlags::default(),
+            },
+        ];
+        dev.i2c_transfer(&mut msgs)?;
+        if let I2cMessage::Write { data: msg_src, .. } = msgs[1] {
+            assert_eq!(msg_src.len(), src.len());
+        }
+        Ok(())
+    }
+
+    {
+        let frm = Frame {
+            class: 0x06,
+            id: 0x00,
+            message: vec![
+                0x00,                   // I2C 1
+                0x00,                   // reserved0
+                (1 << 7 | 13 << 2 | 1), // TX ready on PIO13
+                0x00,                   // TX ready on PIO13
+                //
+                ((addr as u8) << 1), // Slave addr
+                0x00,                // Slave addr
+                0x00,                // Slave addr
+                0x00,                // Slave addr
+                //
+                0x00, // reserved2
+                0x00, // reserved2
+                0x00, // reserved2
+                0x00, // reserved2
+                //
+                0x01, // Inproto mask, UBX only
+                0x00, // Inproto mask, UBX only
+                //
+                0x01, // Outproto mask, UBX only
+                0x00, // Outproto mask, UBX only
+                //
+                0x00, // flags
+                0x00, // flags
+                //
+                0x00, // reserved3
+                0x00, // reserved3
+            ],
+        };
+        let cfg_port = frm.into_framed_vec();
+        println!("{:x?}", cfg_port);
+        write(&mut dev, addr, &cfg_port)?;
+    }
+
+    {
+        let frm = Frame {
+            class: 6,
+            id: 1,
+            message: vec![nav::Pvt::CLASS, nav::Pvt::ID, 1],
+        };
+        let en_msg = frm.into_framed_vec();
+        println!("{:x?}", en_msg);
+        write(&mut dev, addr, &en_msg)?;
+    }
+
+    {
+        let frm = Frame {
+            class: 6,
+            id: 1,
+            message: vec![nav::TimeGps::CLASS, nav::TimeGps::ID, 1],
+        };
+        let en_msg = frm.into_framed_vec();
+        println!("{:x?}", en_msg);
+        write(&mut dev, addr, &en_msg)?;
+    }
+
+    loop {
+        let mut n_avail;
+
+        // The `Number of Bytes available (High Byte)` register (`0xFD`) is sometimes glitchy.
+        // Give it a few tries to think about what it did.
+        //
+        // NOTE: when it does glitch the upper most nibble seems to always be `0x8`, e.g.
+        //
+        // ```
+        // n_avail 0     0000
+        // n_avail 32768 8000 is too high, retry
+        // n_avail 0     0000
+        // ```
+        loop {
+            n_avail = available(&mut dev, addr)?;
+            if n_avail < 4096 {
+                break;
+            }
+            eprintln!("\nn_avail {} {:#06x} is too high, retry", n_avail, n_avail);
+            thread::sleep(Duration::from_millis(50));
+        }
+        thread::sleep(Duration::from_millis(50));
+
+        if n_avail == 0 {
+            thread::sleep(Duration::from_millis(200));
+            continue;
+        }
+
+        eprintln!("\nn_avail {} {:#06x}", n_avail, n_avail);
+
+        let read_len = usize::min(n_avail, scratch.len());
+        let read_buf = &mut scratch[..read_len];
+        read(&mut dev, addr, read_buf)?;
+
+        for &mut b in read_buf {
+            if b == 0xff {
+                eprint!("{:02x}", b);
+            } else {
+                eprint!("  ");
+            }
+            match deframer.push(b) {
+                Err(e) => eprintln!("\ndeframe error {:?}", e),
+                Ok(None) => (),
+                Ok(Some(frame)) => match Msg::from_frame(&frame) {
+                    Err(_) => eprintln!("\nunhandled frame: {:?}", frame),
+                    Ok(msg) => println!("\n{:?}", msg),
+                },
+            }
+        }
+    }
 }
