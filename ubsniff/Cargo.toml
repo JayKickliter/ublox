@@ -8,3 +8,7 @@ edition = "2018"
 serialport = { version = "3", default-features = false }
 structopt = "0.3"
 ublox = { path = ".." }
+
+
+[target.'cfg(target_os = "linux")'.dependencies]
+i2c-linux = "0.1.2"
