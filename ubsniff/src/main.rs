@@ -1,6 +1,13 @@
 mod cmdline;
 use cmdline::Cmdline;
-use std::{error::Error, ffi::OsStr, fs::File, io::Read, path::Path, time::Duration};
+use std::{
+    error::Error,
+    ffi::OsStr,
+    fs::File,
+    io::{ErrorKind, Read},
+    path::Path,
+    time::Duration,
+};
 use structopt::StructOpt;
 use ublox::{framing::Deframer, messages::Msg};
 
@@ -31,7 +38,7 @@ fn file_loop(path: &Path) -> Result<(), Box<dyn Error>> {
 }
 
 fn uart_loop<P: AsRef<OsStr>>(path: &P, baud: u32) -> Result<(), Box<dyn Error>> {
-    use serialport::*;
+    use serialport::prelude::*;
     let mut port = serialport::open_with_settings(
         path,
         &SerialPortSettings {
@@ -47,17 +54,22 @@ fn uart_loop<P: AsRef<OsStr>>(path: &P, baud: u32) -> Result<(), Box<dyn Error>>
     let mut deframer = Deframer::new();
     let mut buf = [0u8; 256];
     loop {
-        let n_read = port.read(buf.as_mut())?;
-        for &b in &buf[..n_read] {
-            match deframer.push(b) {
-                Err(e) => eprintln!("deframe error {:?}", e),
-                Ok(None) => (),
-                Ok(Some(frame)) => match Msg::from_frame(&frame) {
-                    Err(_) => eprintln!("unhandled frame: {:?}", frame),
-                    Ok(msg) => println!("{:#?}", msg),
-                },
+        match port.read(buf.as_mut()) {
+            Err(e) if e.kind() == ErrorKind::TimedOut => (),
+            Err(e) => eprintln!("{:?}", e),
+            Ok(n_read) => {
+                for &b in &buf[..n_read] {
+                    match deframer.push(b) {
+                        Err(e) => eprintln!("deframe error {:?}", e),
+                        Ok(None) => (),
+                        Ok(Some(frame)) => match Msg::from_frame(&frame) {
+                            Err(_) => eprintln!("unhandled frame: {:?}", frame),
+                            Ok(msg) => println!("{:#?}", msg),
+                        },
+                    }
+                }
             }
-        }
+        };
     }
 }
 
