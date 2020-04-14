@@ -1,6 +1,6 @@
 [package]
 name = "ublox"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Jay Kickliter <jay@kickliter.com>"]
 edition = "2018"
 

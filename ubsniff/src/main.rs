@@ -55,7 +55,7 @@ fn uart_loop<P: AsRef<OsStr>>(path: &P, baud: u32) -> Result<(), Box<dyn Error>>
     let mut buf = [0u8; 256];
     loop {
         match port.read(buf.as_mut()) {
-            Err(e) if e.kind() == ErrorKind::TimedOut => (),
+            Err(ref e) if e.kind() == ErrorKind::TimedOut => (),
             Err(e) => eprintln!("{:?}", e),
             Ok(n_read) => {
                 for &b in &buf[..n_read] {
