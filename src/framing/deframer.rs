@@ -38,7 +38,7 @@ impl Deframer {
                 *processed += 1;
                 if *accum == SYNCWORD {
                     *self = Deframer::Class;
-                } else if *processed % 8 == 8 {
+                } else if *processed % 8 == 0 {
                     trace!("still searching for syncword after {} bytes", *processed);
                 }
             }
@@ -76,8 +76,15 @@ impl Deframer {
                 len_b0,
                 cksum,
             } => {
-                trace!("len_h {:#04x} ← len_lsb", input);
                 let len = (usize::from(cksum.push(input)) << 8) | usize::from(*len_b0);
+                // Revert to start state is len is larger than
+                // unreasonable (and arbitrarily chosen) upper limit.
+                if len > 999 {
+                    warn!("declared message length {:#06x} is unreasonably large", len);
+                    *self = Self::default();
+                    return Ok(None);
+                }
+                trace!("len_h {:#04x} ← len_lsb", input);
                 let message = FrameVec::with_capacity(len);
                 *self = Message {
                     class: *class,
