@@ -5,6 +5,8 @@ authors = ["Jay Kickliter <jay@kickliter.com>"]
 edition = "2018"
 
 [dependencies]
+env_logger = "0.7.1"
+log = "*"
 serialport = { version = "3", default-features = false }
 structopt = "0.3"
 ublox = { path = ".." }

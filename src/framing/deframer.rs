@@ -1,6 +1,7 @@
 //! u-blox protocol framing and deframing state machines.
 
 use crate::framing::{Checksum, Frame, FrameError, FrameVec};
+use log::{trace, warn};
 
 /// One-shot defamer utility function.
 pub fn deframe<T>(bytes: T) -> Result<Option<Frame>, FrameError>
@@ -31,15 +32,19 @@ impl Deframer {
     pub fn push(&mut self, input: u8) -> Result<Option<Frame>, FrameError> {
         use self::Deframer::*;
         match self {
-            Sync(accum) => {
+            Sync { accum, processed } => {
                 const SYNCWORD: u16 = 0xB5_62;
                 *accum = (*accum << 8) | u16::from(input);
+                *processed += 1;
                 if *accum == SYNCWORD {
                     *self = Deframer::Class;
+                } else if *processed % 8 == 8 {
+                    trace!("still searching for syncword after {} bytes", *processed);
                 }
             }
 
             Class => {
+                trace!("class {:#04x} ← sync", input);
                 *self = Id {
                     cksum: Checksum::with(input),
                     class: input,
@@ -47,6 +52,7 @@ impl Deframer {
             }
 
             Id { class, cksum } => {
+                trace!("id {:#04x} ← class", input);
                 *self = LengthLsb {
                     class: *class,
                     id: cksum.push(input),
@@ -55,6 +61,7 @@ impl Deframer {
             }
 
             LengthLsb { class, id, cksum } => {
+                trace!("len_l {:#04x} ← id", input);
                 *self = LengthMsb {
                     class: *class,
                     id: *id,
@@ -69,6 +76,7 @@ impl Deframer {
                 len_b0,
                 cksum,
             } => {
+                trace!("len_h {:#04x} ← len_lsb", input);
                 let len = (usize::from(cksum.push(input)) << 8) | usize::from(*len_b0);
                 let message = FrameVec::with_capacity(len);
                 *self = Message {
@@ -104,6 +112,7 @@ impl Deframer {
                 message,
                 cksum_calc,
             } => {
+                trace!("ck_a {:#04x} ← mesg", input);
                 if input == cksum_calc.0 {
                     let mut msg = Vec::new();
                     ::std::mem::swap(message, &mut msg);
@@ -114,6 +123,10 @@ impl Deframer {
                         cksum_calc: *cksum_calc,
                     };
                 } else {
+                    warn!(
+                        "ck_a mismatch, expected {:#04x}, got {:#04x}, msg {:02x?}",
+                        cksum_calc.0, input, message
+                    );
                     *self = Self::default();
                     return Err(FrameError::Checksum);
                 }
@@ -125,6 +138,7 @@ impl Deframer {
                 message,
                 cksum_calc,
             } => {
+                trace!("ck_b {:#04x} ← ck_a", input);
                 let mut msg = Vec::new();
                 ::std::mem::swap(message, &mut msg);
                 let ret = if input == cksum_calc.1 {
@@ -134,6 +148,10 @@ impl Deframer {
                         message: msg,
                     }))
                 } else {
+                    warn!(
+                        "ck_b mismatch, expected {:#04x}, got {:#04x}, msg {:02x?}",
+                        cksum_calc.1, input, msg
+                    );
                     Err(FrameError::Checksum)
                 };
                 *self = Self::default();
@@ -146,7 +164,10 @@ impl Deframer {
 
     /// Returns a new deframer.
     pub fn new() -> Self {
-        Deframer::Sync(0)
+        Deframer::Sync {
+            accum: 0,
+            processed: 0,
+        }
     }
 }
 
@@ -161,7 +182,7 @@ impl Default for Deframer {
 pub enum Deframer {
     /// Shift in every byte until matches value equals the syncword.
     #[doc(hidden)]
-    Sync(u16),
+    Sync { accum: u16, processed: usize },
 
     /// No data, as the byte received durning this state is passed to
     /// next state.

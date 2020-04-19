@@ -1,5 +1,6 @@
 mod cmdline;
 use cmdline::Cmdline;
+use log::{debug, warn};
 #[cfg(target_os = "linux")]
 use std::fmt::Debug;
 use std::{
@@ -17,6 +18,7 @@ type Result<T = ()> = ::std::result::Result<T, Box<dyn Error>>;
 
 fn main() -> Result {
     let cmdline = Cmdline::from_args();
+    env_logger::init();
     match cmdline {
         Cmdline::File { path } => file_loop(&path),
         #[cfg(target_os = "linux")]
@@ -185,7 +187,7 @@ fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
             ],
         };
         let cfg_port = frm.into_framed_vec();
-        println!("{:x?}", cfg_port);
+        debug!("{:x?}", cfg_port);
         write(&mut dev, addr, &cfg_port)?;
     }
 
@@ -196,7 +198,7 @@ fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
             message: vec![nav::Pvt::CLASS, nav::Pvt::ID, 1],
         };
         let en_msg = frm.into_framed_vec();
-        println!("{:x?}", en_msg);
+        debug!("{:x?}", en_msg);
         write(&mut dev, addr, &en_msg)?;
     }
 
@@ -207,7 +209,7 @@ fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
             message: vec![nav::TimeGps::CLASS, nav::TimeGps::ID, 1],
         };
         let en_msg = frm.into_framed_vec();
-        println!("{:x?}", en_msg);
+        debug!("{:x?}", en_msg);
         write(&mut dev, addr, &en_msg)?;
     }
 
@@ -229,7 +231,7 @@ fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
             if n_avail < 4096 {
                 break;
             }
-            eprintln!("\nn_avail {} {:#06x} is too high, retry", n_avail, n_avail);
+            warn!("n_avail {} {:#06x} is too high, retry", n_avail, n_avail);
             thread::sleep(Duration::from_millis(50));
         }
         thread::sleep(Duration::from_millis(50));
@@ -239,24 +241,19 @@ fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
             continue;
         }
 
-        eprintln!("\nn_avail {} {:#06x}", n_avail, n_avail);
+        debug!("n_avail {} {:#06x}", n_avail, n_avail);
 
         let read_len = usize::min(n_avail, scratch.len());
         let read_buf = &mut scratch[..read_len];
         read(&mut dev, addr, read_buf)?;
 
         for &mut b in read_buf {
-            if b == 0xff {
-                eprint!("{:02x}", b);
-            } else {
-                eprint!("  ");
-            }
             match deframer.push(b) {
-                Err(e) => eprintln!("\ndeframe error {:?}", e),
+                Err(e) => warn!("deframe error {:?}", e),
                 Ok(None) => (),
                 Ok(Some(frame)) => match Msg::from_frame(&frame) {
-                    Err(_) => eprintln!("\nunhandled frame: {:?}", frame),
-                    Ok(msg) => println!("\n{:?}", msg),
+                    Err(_) => warn!("unhandled frame: {:?}", frame),
+                    Ok(msg) => println!("\n{:?}\n", msg),
                 },
             }
         }
