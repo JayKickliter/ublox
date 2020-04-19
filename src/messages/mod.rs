@@ -1,14 +1,18 @@
 //! u-blox message types.
+pub mod ack;
 pub mod cfg;
 pub mod nav;
 pub mod primitive;
 use crate::framing::Frame;
+use ack::AckNak;
 use cfg::Cfg;
 use nav::Nav;
 
 /// Top-level enum for valid u-blox messages.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Msg {
+    /// Ack/Nak
+    AckNak(AckNak),
     /// Configuration message.
     Cfg(Cfg),
     /// Navigation message.
@@ -21,6 +25,7 @@ impl Msg {
         match frame.class {
             cfg::Cfg::CLASS => Ok(Msg::Cfg(Cfg::from_frame(frame)?)),
             nav::Nav::CLASS => Ok(Msg::Nav(Nav::from_frame(frame)?)),
+            ack::AckNak::CLASS => Ok(Msg::AckNak(AckNak::from_frame(frame)?)),
             _ => Err(()),
         }
     }
