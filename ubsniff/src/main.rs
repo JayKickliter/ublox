@@ -1,6 +1,6 @@
 mod cmdline;
 use cmdline::Cmdline;
-use log::{debug, warn};
+use log::{debug, error, warn};
 #[cfg(target_os = "linux")]
 use std::fmt::Debug;
 use std::{
@@ -16,14 +16,18 @@ use ublox::{framing::Deframer, messages::Msg};
 
 type Result<T = ()> = ::std::result::Result<T, Box<dyn Error>>;
 
-fn main() -> Result {
+fn main() {
     let cmdline = Cmdline::from_args();
     env_logger::init();
-    match cmdline {
+    let res = match cmdline {
         Cmdline::File { path } => file_loop(&path),
         #[cfg(target_os = "linux")]
         Cmdline::I2c { path, addr } => i2c_loop(&path, addr),
         Cmdline::Serial { path, baud } => uart_loop(&path, baud),
+    };
+    if let Err(e) = res {
+        error!("exiting early with {}", e);
+        ::std::process::exit(1);
     }
 }
 
