@@ -73,7 +73,7 @@ pub fn frame<M: Message>(msg: &M, buf: &mut [u8]) -> Result<usize, ()> {
         let mut cksm = Checksum::default();
         // The checksum is calculated from class to end of message, hence
         // `skip(2)`
-        for b in buf.iter().skip(2) {
+        for b in buf[2..buf.len() - 2].iter() {
             cksm.push(*b);
         }
         let (ck_a, ck_b) = cksm.take();
