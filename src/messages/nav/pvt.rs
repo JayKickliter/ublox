@@ -1,4 +1,5 @@
 use crate::messages::{primitive::*, Message};
+use bitfield::bitfield;
 use nom::{do_parse, le_i16, le_i32, le_u16, le_u32, le_u8, named_attr, take};
 
 /// This message combines position, velocity and time solution,
@@ -53,7 +54,7 @@ pub struct Pvt {
     ///
     /// ### Unit
     /// -
-    valid: X1,
+    valid: Valid,
 
     /// Time accuracy estimate {UTC)
     ///
@@ -78,13 +79,13 @@ pub struct Pvt {
     ///
     /// ### Unit
     /// -
-    flags: X1,
+    flags: Flags,
 
     /// Additional flags (see graphic below)
     ///
     /// ### Unit
     /// -
-    fags2: X1,
+    flags2: Flags2,
 
     /// Number of satellites used in Nav Solution
     ///
@@ -205,6 +206,66 @@ pub struct Pvt {
     macAcc: U2,
 }
 
+bitfield! {
+    /// Bitfield `valid`.
+    #[derive(Clone, Eq, PartialEq)]
+    pub struct Valid(X1);
+    impl Debug;
+    /// valid magnetic declination
+    pub validMag, _: 3;
+    /// UTC time of day has been fully resolved (no seconds
+    /// uncertainty). Cannot be used to check if time is completely
+    /// solved.
+    pub fullyResolved, _: 2;
+    /// valid UTC time of day (see Time Validity section for details)
+    pub validTime, _: 1;
+    /// valid UTC Date (see Time Validity section for details)
+    pub validDate, _: 0;
+
+}
+
+bitfield! {
+    /// Bitfield `flags`.
+    #[derive(Clone, Eq, PartialEq)]
+    pub struct Flags(X1);
+    impl Debug;
+    /// Carrier phase range solution status
+    ///
+    /// 0: no carrier phase range solution
+    /// 1: carrier phase range solution with floating ambiguities
+    /// 2: carrier phase range solution with fixed ambiguities (not supported in protocol versions less than 20)
+    pub carrSoln, _: 7, 6;
+    /// heading of vehicle is valid, only set if the receiver is in
+    /// sensor fusion mode
+    pub headVehValid, _: 5;
+    /// Undocumented
+    pub psmState, _: 4, 2;
+    /// differential corrections were applied
+    pub diffSoln, _: 1;
+    /// valid fix (i.e within DOP & accuracy masks)
+    pub gnssFixOK, _: 0;
+}
+
+bitfield! {
+    /// Bitfield `flags2`.
+    #[derive(Clone, Eq, PartialEq)]
+    pub struct Flags2(X1);
+    impl Debug;
+    /// information about UTC Date and Time of Day validity
+    /// confirmation is available (see Time Validity section for
+    /// details).
+    ///
+    /// This flag is only supported in Protocol Versions 19.00, 19.10,
+    /// 20.10, 20.20, 20.30, 22.00, 23.00, 23.01, 27 and 28.
+    pub confirmedAvai, _: 7;
+    /// UTC Date validity could be confirmed (see Time Validity
+    /// section for details)
+    pub confirmedDate, _: 6;
+    /// UTC Time of Day could be confirmed (see Time Validity section
+    /// for details)
+    pub confirmedTime, _: 5;
+}
+
 impl Message for Pvt {
     const CLASS: u8 = 0x01;
     const ID: u8 = 0x07;
@@ -227,7 +288,7 @@ impl Pvt {
                   nano: le_i32 >>
                   fxType: le_u8 >>
                   flags: le_u8 >>
-                  fags2: le_u8 >>
+                  flags2: le_u8 >>
                   numSV: le_u8 >>
                   lon: le_i32 >>
                   lat: le_i32 >>
@@ -255,12 +316,12 @@ impl Pvt {
                         hour,
                         min,
                         sec,
-                        valid,
+                        valid: Valid(valid),
                         tAcc,
                         nano,
                         fxType,
-                        flags,
-                        fags2,
+                        flags: Flags(flags),
+                        flags2: Flags2(flags2),
                         numSV,
                         lon,
                         lat,

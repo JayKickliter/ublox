@@ -9,6 +9,7 @@ members = [ "ubsniff" ]
 default-members = [ "ubsniff" ]
 
 [dependencies]
+bitfield = "0.13.2"
 log = "0.4.8"
 nom = "4"
 zerocopy = "0.3.0"
