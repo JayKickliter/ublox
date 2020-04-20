@@ -87,13 +87,13 @@ fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
     use i2c_linux::{I2c, Message as I2cMessage, ReadFlags, WriteFlags};
     use std::thread;
     use ublox::{
-        framing::Frame,
-        messages::{nav, Message},
+        framing::{frame, Frame},
+        messages::{cfg, nav, Message},
     };
 
     let mut dev = I2c::from_path(path)?;
     let mut deframer = Deframer::new();
-    let mut scratch = [0u8; 128];
+    let mut scratch = [0x00_u8; 128];
 
     fn available(dev: &mut I2c<File>, addr: u16) -> Result<usize> {
         const UBX_BYTES_AVAIL_REG: u8 = 0xFD;
@@ -157,6 +157,32 @@ fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
         Ok(())
     }
 
+    // Disable all protocols on UART
+    {
+        use cfg::prt;
+        let msg = prt::Prt::Uart {
+            tx_ready: prt::TxReady(0),
+            in_proto_mask: {
+                let mut mask = prt::InProtoMask(0);
+                mask.set_in_ubx(true);
+                mask
+            },
+            out_proto_mask: prt::OutProtoMask(0),
+            baud_rate: 9600,
+            flags: prt::Flags(0),
+            mode: {
+                let mut mode = prt::UartMode(0);
+                mode.set_n_stop_bits(0b00);
+                mode.set_parity(0b100);
+                mode.set_char_len(0b11);
+                mode
+            },
+        };
+        let len = frame(&msg, &mut scratch).unwrap();
+        debug!("{:02x?}", &scratch[..len]);
+        write(&mut dev, addr, &scratch[..len])?;
+    }
+
     {
         let frm = Frame {
             class: 0x06,
@@ -191,7 +217,7 @@ fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
             ],
         };
         let cfg_port = frm.into_framed_vec();
-        debug!("{:x?}", cfg_port);
+        debug!("{:02x?}", cfg_port);
         write(&mut dev, addr, &cfg_port)?;
     }
 
@@ -232,10 +258,13 @@ fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
         // ```
         loop {
             n_avail = available(&mut dev, addr)?;
-            if n_avail < 4096 {
+            if n_avail != 0x8000 && n_avail != 0x0080 {
                 break;
             }
-            warn!("n_avail {} {:#06x} is too high, retry", n_avail, n_avail);
+            warn!(
+                "n_avail {} {:#06x} appears to be a glitch, retry",
+                n_avail, n_avail
+            );
             thread::sleep(Duration::from_millis(50));
         }
         thread::sleep(Duration::from_millis(50));

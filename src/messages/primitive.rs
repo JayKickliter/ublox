@@ -10,5 +10,6 @@ pub type R8 = f64;
 pub type U1 = u8;
 pub type U2 = u16;
 pub type U4 = u32;
-pub type X4 = u32;
 pub type X1 = u8;
+pub type X2 = u16;
+pub type X4 = u32;

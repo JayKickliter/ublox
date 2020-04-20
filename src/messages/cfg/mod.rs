@@ -7,15 +7,16 @@
 //! processing unsuccessfully.
 
 mod msg;
+pub mod prt;
 use crate::framing::Frame;
 use crate::messages::Message;
-pub use msg::*;
+pub use msg::SetMsgRates;
 
 /// Configuration messages.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Cfg {
-    SetMsgRates(SetMsgRates),
+    SetMsgRates(msg::SetMsgRates),
 }
 
 impl Cfg {
@@ -29,9 +30,9 @@ impl Cfg {
         };
 
         match (frame.class, frame.id, frame.message.len()) {
-            (SetMsgRates::CLASS, SetMsgRates::ID, SetMsgRates::LEN) => Ok(Cfg::SetMsgRates(
-                SetMsgRates::parse(frame.message.as_ref())?,
-            )),
+            (msg::SetMsgRates::CLASS, msg::SetMsgRates::ID, msg::SetMsgRates::LEN) => Ok(
+                Cfg::SetMsgRates(msg::SetMsgRates::parse(frame.message.as_ref())?),
+            ),
             _ => Err(()),
         }
     }
