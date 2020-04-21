@@ -55,11 +55,31 @@ pub enum Prt {
         /// Flags bit mask
         flags: Flags,
     },
+    /// Port configuration for SPI port.
+    Spi {
+        /// TX ready PIN configuration.
+        tx_ready: TxReady,
+        ///  SPI Mode Flags
+        mode: SpiMode,
+        /// A mask describing which input protocols are active.
+        ///
+        /// Each bit of this mask is used for a protocol. Through
+        /// that, multiple protocols can be defined on a single port.
+        in_proto_mask: InProtoMask,
+        /// A mask describing which output protocols are active.
+        ///
+        /// Each bit of this mask is used for a protocol. Through that,
+        /// multiple protocols can be defined on a single port.
+        out_proto_mask: OutProtoMask,
+        /// Flags bit mask
+        flags: Flags,
+    },
 }
 
 impl Prt {
-    const UART_PORT: u8 = 1;
     const I2C_PORT: u8 = 0;
+    const UART_PORT: u8 = 1;
+    const SPI_PORT: u8 = 4;
 }
 
 impl Message for Prt {
@@ -102,6 +122,26 @@ impl Message for Prt {
                 flags,
             } => {
                 csr.write_u8(Self::I2C_PORT).map_err(|_| ())?;
+                // reserved 1
+                csr.write_u8(0).map_err(|_| ())?;
+                csr.write_u16::<LE>(tx_ready.0).map_err(|_| ())?;
+                csr.write_u32::<LE>(mode.0).map_err(|_| ())?;
+                // reserved2
+                csr.write_u32::<LE>(0).map_err(|_| ())?;
+                csr.write_u16::<LE>(in_proto_mask.0).map_err(|_| ())?;
+                csr.write_u16::<LE>(out_proto_mask.0).map_err(|_| ())?;
+                csr.write_u16::<LE>(flags.0).map_err(|_| ())?;
+                // reserved3
+                csr.write_u16::<LE>(0).map_err(|_| ())?;
+            }
+            Prt::Spi {
+                tx_ready,
+                mode,
+                in_proto_mask,
+                out_proto_mask,
+                flags,
+            } => {
+                csr.write_u8(Self::SPI_PORT).map_err(|_| ())?;
                 // reserved 1
                 csr.write_u8(0).map_err(|_| ())?;
                 csr.write_u16::<LE>(tx_ready.0).map_err(|_| ())?;
@@ -188,6 +228,25 @@ bitfield! {
     u8;
     /// Slave addr.
     pub slave_addr, set_slave_addr: 7, 1;
+}
+
+bitfield! {
+    /// Bitfield `mode` for spi port configuration.
+    #[derive(Clone, Copy, Eq, PartialEq)]
+    pub struct SpiMode(X4);
+    impl Debug;
+    u8;
+    /// Number of bytes containing 0xFF to receive before switching off reception.
+    ///
+    /// Range: 0 (mechanism off) - 63
+    pub ff_cnt, set_ff_cnt: 13, 8;
+    /// Phase.
+    ///
+    /// - 00 SPI Mode 0: CPOL = 0, CPHA = 0
+    /// - 01 SPI Mode 1: CPOL = 0, CPHA = 1
+    /// - 10 SPI Mode 2: CPOL = 1, CPHA = 0
+    /// - 11 SPI Mode 3: CPOL = 1, CPHA = 1
+    pub spi_mode, set_spi_mode: 2, 1;
 }
 
 bitfield! {
