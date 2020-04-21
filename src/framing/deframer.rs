@@ -30,7 +30,7 @@ impl Deframer {
                 *processed += 1;
                 if *accum == SYNCWORD {
                     *self = Deframer::Class;
-                } else if *processed % 8 == 0 {
+                } else if *processed % 7 == 0 {
                     trace!("still searching for syncword after {} bytes", *processed);
                 }
             }
