@@ -37,9 +37,8 @@ fn file_loop(path: &Path) -> Result {
     let mut deframer = Deframer::new();
     for b in file.bytes() {
         match deframer.push(b?) {
-            Err(e) => eprintln!("deframe error {:?}", e),
-            Ok(None) => (),
-            Ok(Some(frame)) => match Msg::from_frame(&frame) {
+            None => (),
+            Some(frame) => match Msg::from_frame(&frame) {
                 Err(_) => eprintln!("unhandled frame: {:?}", frame),
                 Ok(msg) => println!("{:#?}", msg),
             },
@@ -70,9 +69,8 @@ fn uart_loop<P: AsRef<OsStr>>(path: &P, baud: u32) -> Result {
             Err(ref e) if e.kind() == ErrorKind::TimedOut => (),
             Err(e) => eprintln!("{:?}", e),
             Ok(b) => match deframer.push(b) {
-                Err(e) => eprintln!("deframe error {:?}", e),
-                Ok(None) => (),
-                Ok(Some(frame)) => match Msg::from_frame(&frame) {
+                None => (),
+                Some(frame) => match Msg::from_frame(&frame) {
                     Err(_) => eprintln!("unhandled frame: {:?}", frame),
                     Ok(msg) => println!("{:#?}", msg),
                 },
@@ -277,9 +275,8 @@ fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
 
         for &mut b in read_buf {
             match deframer.push(b) {
-                Err(e) => warn!("deframe error {:?}", e),
-                Ok(None) => (),
-                Ok(Some(frame)) => match Msg::from_frame(&frame) {
+                None => (),
+                Some(frame) => match Msg::from_frame(&frame) {
                     Err(_) => warn!("unhandled frame: {:?}", frame),
                     Ok(msg) => println!("\n{:?}\n", msg),
                 },

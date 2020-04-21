@@ -1,35 +1,27 @@
 //! u-blox protocol framing and deframing state machines.
 
-use crate::framing::{Checksum, Frame, FrameError, FrameVec};
+use crate::framing::{Checksum, Frame, FrameVec};
 use log::{trace, warn};
 
 /// One-shot defamer utility function.
-pub fn deframe<T>(bytes: T) -> Result<Option<Frame>, FrameError>
+pub fn deframe<T>(bytes: T) -> Option<Frame>
 where
     T: IntoIterator<Item = u8>,
 {
     let mut deframer = Deframer::new();
     for b in bytes {
-        if let res @ Ok(Some(Frame { .. })) = deframer.push(b) {
+        if let res @ Some(_) = deframer.push(b) {
             return res;
         }
     }
-    Ok(None)
+    None
 }
 
 impl Deframer {
     /// Incrementally parses a u-blox message frame with the given
     /// `input`, returning a an error or optional [`Frame`].
-    ///
-    /// # Errors
-    ///
-    /// Upon any error when parsing the current `input` byte, this
-    /// function returns an [`Error`].
-    ///
-    /// [`Frame`]: struct.Frame.html
-    /// [`Error`]: enum.Error.html
     #[inline]
-    pub fn push(&mut self, input: u8) -> Result<Option<Frame>, FrameError> {
+    pub fn push(&mut self, input: u8) -> Option<Frame> {
         use self::Deframer::*;
         match self {
             Sync { accum, processed } => {
@@ -82,7 +74,7 @@ impl Deframer {
                 if len > 999 {
                     warn!("declared message length {:#06x} is unreasonably large", len);
                     *self = Self::default();
-                    return Ok(None);
+                    return None;
                 }
                 trace!("len_h {:#04x} ← len_lsb", input);
                 let message = FrameVec::with_capacity(len);
@@ -135,7 +127,6 @@ impl Deframer {
                         cksum_calc.0, input, message
                     );
                     *self = Self::default();
-                    return Err(FrameError::Checksum);
                 }
             }
 
@@ -149,24 +140,24 @@ impl Deframer {
                 let mut msg = Vec::new();
                 ::std::mem::swap(message, &mut msg);
                 let ret = if input == cksum_calc.1 {
-                    Ok(Some(Frame {
+                    Some(Frame {
                         class: *class,
                         id: *id,
                         message: msg,
-                    }))
+                    })
                 } else {
                     warn!(
                         "ck_b mismatch, expected {:#04x}, got {:#04x}, msg {:02x?}",
                         cksum_calc.1, input, msg
                     );
-                    Err(FrameError::Checksum)
+                    None
                 };
                 *self = Self::default();
                 return ret;
             }
         };
 
-        Ok(None)
+        None
     }
 
     /// Returns a new deframer.
