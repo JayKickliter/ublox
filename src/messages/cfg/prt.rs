@@ -36,10 +36,30 @@ pub enum Prt {
         /// Flags bit mask
         flags: Flags,
     },
+    /// Port configuration for I2C (DDC) port.
+    I2c {
+        /// TX ready PIN configuration.
+        tx_ready: TxReady,
+        ///  I2C (DDC) Mode Flags
+        mode: I2cMode,
+        /// A mask describing which input protocols are active.
+        ///
+        /// Each bit of this mask is used for a protocol. Through
+        /// that, multiple protocols can be defined on a single port.
+        in_proto_mask: InProtoMask,
+        /// A mask describing which output protocols are active.
+        ///
+        /// Each bit of this mask is used for a protocol. Through that,
+        /// multiple protocols can be defined on a single port.
+        out_proto_mask: OutProtoMask,
+        /// Flags bit mask
+        flags: Flags,
+    },
 }
 
 impl Prt {
     const UART_PORT: u8 = 1;
+    const I2C_PORT: u8 = 0;
 }
 
 impl Message for Prt {
@@ -74,66 +94,30 @@ impl Message for Prt {
                 // reserved2
                 csr.write_u16::<LE>(0).map_err(|_| ())?;
             }
+            Prt::I2c {
+                tx_ready,
+                mode,
+                in_proto_mask,
+                out_proto_mask,
+                flags,
+            } => {
+                csr.write_u8(Self::I2C_PORT).map_err(|_| ())?;
+                // reserved 1
+                csr.write_u8(0).map_err(|_| ())?;
+                csr.write_u16::<LE>(tx_ready.0).map_err(|_| ())?;
+                csr.write_u32::<LE>(mode.0).map_err(|_| ())?;
+                // reserved2
+                csr.write_u32::<LE>(0).map_err(|_| ())?;
+                csr.write_u16::<LE>(in_proto_mask.0).map_err(|_| ())?;
+                csr.write_u16::<LE>(out_proto_mask.0).map_err(|_| ())?;
+                csr.write_u16::<LE>(flags.0).map_err(|_| ())?;
+                // reserved3
+                csr.write_u16::<LE>(0).map_err(|_| ())?;
+            }
         }
         assert_eq!(csr.position() as usize, Self::LEN);
         Ok(())
     }
-}
-
-bitfield! {
-    /// Bitfield `mode` for uart port configuration.
-    #[derive(Clone, Copy, Eq, PartialEq)]
-    pub struct UartMode(X4);
-    impl Debug;
-    /// Number of Stop bits
-    ///
-    /// - 00 1 Stop bit
-    /// - 01 1.5 Stop bit
-    /// - 10 2 Stop bit
-    /// - 11 0.5 Stop bit
-    pub n_stop_bits, set_n_stop_bits: 13, 12;
-    /// Parity
-    ///
-    /// - 000 Even parity
-    /// - 001 Odd parity
-    /// - 10X No parity
-    /// - X1X Reserved
-    pub parity, set_parity: 11, 9;
-    /// Character length
-    ///
-    /// - 00 5bit (not supported)
-    /// - 01 6bit (not supported)
-    /// - 10 7bit (supported only with parity)
-    /// - 11 8bit
-    pub char_len, set_char_len: 7, 6;
-}
-
-bitfield! {
-    /// A mask describing which input protocols are active.
-    #[derive(Clone, Copy, Eq, PartialEq)]
-    pub struct InProtoMask(X2);
-    impl Debug;
-    /// RTCM3 protocol (not supported in protocol versions less than 20)
-    pub in_rtcm3, set_in_rtcm3: 5;
-    /// RTCM2 protocol
-    pub in_rtcm, set_in_rtcm: 2;
-    /// NMEA protocol
-    pub in_nmea, set_in_nmea: 1;
-    /// UBX protocol
-    pub in_ubx, set_in_ubx: 0;
-}
-
-bitfield! {
-    /// A mask describing which output protocols are active.
-    #[derive(Clone, Copy, Eq, PartialEq)]
-    pub struct OutProtoMask(X2);
-    impl Debug;
-    /// RTCM3 protocol (not supported in protocol versions less than 20)
-    pub out_rtcm3, set_out_rtcm3: 5;
-    /// NMEA protocol
-    pub out_nmea, set_out_nmea: 1;
-    /// UBX protocol
-    pub out_ubx, set_out_ubx: 0;
 }
 
 bitfield! {
@@ -166,6 +150,72 @@ bitfield! {
     pub pol, set_pol: 1;
     /// Enable TX ready feature for this port
     pub en, set_en: 0;
+}
+
+bitfield! {
+    /// Bitfield `mode` for uart port configuration.
+    #[derive(Clone, Copy, Eq, PartialEq)]
+    pub struct UartMode(X4);
+    impl Debug;
+    /// Number of Stop bits
+    ///
+    /// - 00 1 Stop bit
+    /// - 01 1.5 Stop bit
+    /// - 10 2 Stop bit
+    /// - 11 0.5 Stop bit
+    pub n_stop_bits, set_n_stop_bits: 13, 12;
+    /// Parity
+    ///
+    /// - 000 Even parity
+    /// - 001 Odd parity
+    /// - 10X No parity
+    /// - X1X Reserved
+    pub parity, set_parity: 11, 9;
+    /// Character length
+    ///
+    /// - 00 5bit (not supported)
+    /// - 01 6bit (not supported)
+    /// - 10 7bit (supported only with parity)
+    /// - 11 8bit
+    pub char_len, set_char_len: 7, 6;
+}
+
+bitfield! {
+    /// Bitfield `mode` for i2c port configuration.
+    #[derive(Clone, Copy, Eq, PartialEq)]
+    pub struct I2cMode(X4);
+    impl Debug;
+    u8;
+    /// Slave addr.
+    pub slave_addr, set_slave_addr: 7, 1;
+}
+
+bitfield! {
+    /// A mask describing which input protocols are active.
+    #[derive(Clone, Copy, Eq, PartialEq)]
+    pub struct InProtoMask(X2);
+    impl Debug;
+    /// RTCM3 protocol (not supported in protocol versions less than 20)
+    pub in_rtcm3, set_in_rtcm3: 5;
+    /// RTCM2 protocol
+    pub in_rtcm, set_in_rtcm: 2;
+    /// NMEA protocol
+    pub in_nmea, set_in_nmea: 1;
+    /// UBX protocol
+    pub in_ubx, set_in_ubx: 0;
+}
+
+bitfield! {
+    /// A mask describing which output protocols are active.
+    #[derive(Clone, Copy, Eq, PartialEq)]
+    pub struct OutProtoMask(X2);
+    impl Debug;
+    /// RTCM3 protocol (not supported in protocol versions less than 20)
+    pub out_rtcm3, set_out_rtcm3: 5;
+    /// NMEA protocol
+    pub out_nmea, set_out_nmea: 1;
+    /// UBX protocol
+    pub out_ubx, set_out_ubx: 0;
 }
 
 bitfield! {

@@ -183,42 +183,37 @@ fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
         write(&mut dev, addr, &scratch[..len])?;
     }
 
+    // Configure I2C port to be ubx protocol only.
     {
-        let frm = Frame {
-            class: 0x06,
-            id: 0x00,
-            message: vec![
-                0x00,                   // I2C 1
-                0x00,                   // reserved0
-                (1 << 7 | 13 << 2 | 1), // TX ready on PIO13
-                0x00,                   // TX ready on PIO13
-                //
-                ((addr as u8) << 1), // Slave addr
-                0x00,                // Slave addr
-                0x00,                // Slave addr
-                0x00,                // Slave addr
-                //
-                0x00, // reserved2
-                0x00, // reserved2
-                0x00, // reserved2
-                0x00, // reserved2
-                //
-                0x01, // Inproto mask, UBX only
-                0x00, // Inproto mask, UBX only
-                //
-                0x01, // Outproto mask, UBX only
-                0x00, // Outproto mask, UBX only
-                //
-                0x00, // flags
-                0x00, // flags
-                //
-                0x00, // reserved3
-                0x00, // reserved3
-            ],
+        use cfg::prt;
+        let msg = prt::Prt::I2c {
+            tx_ready: {
+                let mut txr = prt::TxReady(0);
+                txr.set_thres(1);
+                txr.set_pin(13);
+                txr.set_en(true);
+                txr
+            },
+            mode: {
+                let mut mode = prt::I2cMode(0);
+                mode.set_slave_addr(addr as u8);
+                mode
+            },
+            in_proto_mask: {
+                let mut mask = prt::InProtoMask(0);
+                mask.set_in_ubx(true);
+                mask
+            },
+            out_proto_mask: {
+                let mut mask = prt::OutProtoMask(0);
+                mask.set_out_ubx(true);
+                mask
+            },
+            flags: prt::Flags(0),
         };
-        let cfg_port = frm.into_framed_vec();
-        debug!("{:02x?}", cfg_port);
-        write(&mut dev, addr, &cfg_port)?;
+        let len = frame(&msg, &mut scratch).unwrap();
+        debug!("{:02x?}", &scratch[..len]);
+        write(&mut dev, addr, &scratch[..len])?;
     }
 
     {
