@@ -26,6 +26,9 @@ pub enum Cmdline {
         /// I2C bus address.
         #[structopt(name = "ADDR", default_value = "0x42", parse(try_from_str = u16::from_hex_dec_bin))]
         addr: u16,
+        /// TX data ready pin.
+        #[structopt(name = "PIN", short = "p", long = "pin")]
+        tx_ready_pin: Option<u64>,
     },
 }
 

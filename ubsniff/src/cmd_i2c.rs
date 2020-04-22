@@ -3,13 +3,14 @@ use i2c_linux::{I2c, Message as I2cMessage, ReadFlags, WriteFlags};
 use log;
 use std::thread;
 use std::{fmt::Debug, fs::File, path::Path, time::Duration};
+use sysfs_gpio as gpio;
 use ublox::{framing::Deframer, messages::Msg};
 use ublox::{
     framing::{frame, Frame},
     messages::{cfg, nav, Message},
 };
 
-pub fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
+pub fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16, tx_ready_pin: Option<u64>) -> Result {
     let mut dev = I2c::from_path(path)?;
     let mut deframer = Deframer::new();
     let mut scratch = [0x00_u8; 128];
@@ -95,7 +96,31 @@ pub fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
         write(&mut dev, addr, &en_msg)?;
     }
 
+    let mut pin: Option<(gpio::Pin, gpio::PinPoller)> = tx_ready_pin.map(|pinnum| {
+        let pin = gpio::Pin::new(pinnum);
+        pin.export().expect("GPIO pin does can not be exported");
+        pin.set_direction(gpio::Direction::In)
+            .expect("GPIO pin does can not be an input");
+        pin.set_edge(gpio::Edge::RisingEdge)
+            .expect("GPIO pin does not support interrupts");
+        (
+            pin,
+            pin.get_poller().expect("GPIO pin does not support polling"),
+        )
+    });
+
     loop {
+        if let Some((pin, poller)) = pin.as_mut() {
+            if 0 == pin.get_value().unwrap() {
+                const TIMEOUT: isize = 1100;
+                match poller.poll(TIMEOUT) {
+                    Err(e) => log::error!("polling tx_ready {} ", e),
+                    Ok(None) => log::warn!("timed out after waiting {} ms for tx_ready", TIMEOUT),
+                    Ok(Some(_)) => log::info!("tx_ready"),
+                }
+            }
+        };
+
         let mut n_avail;
 
         // The `Number of Bytes available (High Byte)` register (`0xFD`) is sometimes glitchy.

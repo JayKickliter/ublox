@@ -13,7 +13,11 @@ fn main() {
     let res = match cmdline {
         Cmdline::File { path } => cmd_file::file_loop(&path),
         #[cfg(target_os = "linux")]
-        Cmdline::I2c { path, addr } => cmd_i2c::i2c_loop(&path, addr),
+        Cmdline::I2c {
+            path,
+            addr,
+            tx_ready_pin,
+        } => cmd_i2c::i2c_loop(&path, addr, tx_ready_pin),
         Cmdline::Serial { path, baud } => cmd_uart::uart_loop(&path, baud),
     };
     if let Err(e) = res {

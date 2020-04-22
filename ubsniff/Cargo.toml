@@ -14,3 +14,4 @@ ublox = { path = ".." }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 i2c-linux = "0.1.2"
+sysfs_gpio = "0.5"
