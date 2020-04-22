@@ -1,6 +1,6 @@
 use crate::error::Result;
 use i2c_linux::{I2c, Message as I2cMessage, ReadFlags, WriteFlags};
-use log::{debug, warn};
+use log;
 use std::thread;
 use std::{fmt::Debug, fs::File, path::Path, time::Duration};
 use ublox::{framing::Deframer, messages::Msg};
@@ -36,7 +36,7 @@ pub fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
             },
         };
         let len = frame(&msg, &mut scratch).unwrap();
-        debug!("{:02x?}", &scratch[..len]);
+        log::debug!("{:02x?}", &scratch[..len]);
         write(&mut dev, addr, &scratch[..len])?;
     }
 
@@ -69,7 +69,7 @@ pub fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
             flags: prt::Flags(0),
         };
         let len = frame(&msg, &mut scratch).unwrap();
-        debug!("{:02x?}", &scratch[..len]);
+        log::debug!("{:02x?}", &scratch[..len]);
         write(&mut dev, addr, &scratch[..len])?;
     }
 
@@ -80,7 +80,7 @@ pub fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
             message: vec![nav::Pvt::CLASS, nav::Pvt::ID, 1],
         };
         let en_msg = frm.into_framed_vec();
-        debug!("{:x?}", en_msg);
+        log::debug!("{:x?}", en_msg);
         write(&mut dev, addr, &en_msg)?;
     }
 
@@ -91,7 +91,7 @@ pub fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
             message: vec![nav::TimeGps::CLASS, nav::TimeGps::ID, 1],
         };
         let en_msg = frm.into_framed_vec();
-        debug!("{:x?}", en_msg);
+        log::debug!("{:x?}", en_msg);
         write(&mut dev, addr, &en_msg)?;
     }
 
@@ -113,9 +113,10 @@ pub fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
             if n_avail != 0x8000 && n_avail != 0x0080 {
                 break;
             }
-            warn!(
+            log::warn!(
                 "n_avail {} {:#06x} appears to be a glitch, retry",
-                n_avail, n_avail
+                n_avail,
+                n_avail
             );
             thread::sleep(Duration::from_millis(50));
         }
@@ -126,7 +127,7 @@ pub fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
             continue;
         }
 
-        debug!("n_avail {} {:#06x}", n_avail, n_avail);
+        log::debug!("n_avail {} {:#06x}", n_avail, n_avail);
 
         let read_len = usize::min(n_avail, scratch.len());
         let read_buf = &mut scratch[..read_len];
@@ -136,7 +137,7 @@ pub fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
             match deframer.push(b) {
                 None => (),
                 Some(frame) => match Msg::from_frame(&frame) {
-                    Err(_) => warn!("unhandled frame: {:?}", frame),
+                    Err(_) => log::warn!("unhandled frame: {:?}", frame),
                     Ok(msg) => println!("\n{:?}\n", msg),
                 },
             }

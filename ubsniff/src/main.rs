@@ -5,7 +5,6 @@ mod cmd_uart;
 mod cmdline;
 mod error;
 use cmdline::Cmdline;
-use log::error;
 use structopt::StructOpt;
 
 fn main() {
@@ -18,7 +17,7 @@ fn main() {
         Cmdline::Serial { path, baud } => cmd_uart::uart_loop(&path, baud),
     };
     if let Err(e) = res {
-        error!("exiting early with {}", e);
+        eprintln!("error: {}", e);
         ::std::process::exit(1);
     }
 }
