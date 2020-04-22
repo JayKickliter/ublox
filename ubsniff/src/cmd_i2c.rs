@@ -131,7 +131,10 @@ pub fn i2c_loop<P: AsRef<Path> + Debug>(path: &P, addr: u16) -> Result {
 
         let read_len = usize::min(n_avail, scratch.len());
         let read_buf = &mut scratch[..read_len];
-        read(&mut dev, addr, read_buf)?;
+        if read(&mut dev, addr, read_buf).is_err() {
+            log::error!("i2c read error, trying once more");
+            continue;
+        }
 
         for &mut b in read_buf {
             match deframer.push(b) {
@@ -160,7 +163,10 @@ fn available(dev: &mut I2c<File>, addr: u16) -> Result<usize> {
             flags: ReadFlags::default(),
         },
     ];
-    dev.i2c_transfer(&mut msgs)?;
+    if dev.i2c_transfer(&mut msgs).is_err() {
+        log::error!("i2c transfer failure. trying once more");
+        dev.i2c_transfer(&mut msgs)?;
+    }
     Ok(u16::from_be_bytes(available).into())
 }
 
@@ -200,7 +206,10 @@ fn write(dev: &mut I2c<File>, addr: u16, src: &[u8]) -> Result {
             flags: WriteFlags::default(),
         },
     ];
-    dev.i2c_transfer(&mut msgs)?;
+    if dev.i2c_transfer(&mut msgs).is_err() {
+        log::error!("i2c transfer failure. trying once more");
+        dev.i2c_transfer(&mut msgs)?;
+    }
     if let I2cMessage::Write { data: msg_src, .. } = msgs[1] {
         assert_eq!(msg_src.len(), src.len());
     }
