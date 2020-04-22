@@ -244,8 +244,8 @@ mod test {
         let msg = [0xb5, 0x62, 0x05, 0x01, 0x01, 0x00, 0x06, 0x0d, 0x26];
         let mut deframer = Deframer::new();
         let mut res = None;
-        for b in msg.as_ref() {
-            res = deframer.push(*b).unwrap();
+        for &b in msg.as_ref() {
+            res = deframer.push(b);
         }
         assert!(res.is_some());
     }
