@@ -1,5 +1,5 @@
 use crate::messages::{primitive::*, Message};
-use nom::{do_parse, le_i16, le_i32, le_i8, le_u32, le_u8, named_attr};
+use bytes::{Buf, BufMut};
 
 /// This message reports the precise GPS time of the most recent
 /// navigation solution including validity flags and an accuracy
@@ -47,19 +47,50 @@ impl Message for TimeGps {
     const CLASS: u8 = 0x01;
     const ID: u8 = 0x20;
     const LEN: usize = 16;
-}
 
-impl TimeGps {
-    named_attr!(
-        #[doc = "Parses `Self` from provided buffer."],
-        pub parse<&[u8], TimeGps>,
-        do_parse!(iTOW: le_u32 >>
-                  fTOW: le_i32 >>
-                  week: le_i16 >>
-                  leapS: le_i8 >>
-                  valid: le_u8 >>
-                  tAcc: le_u32 >>
-                  (TimeGps{iTOW, fTOW, week, leapS, valid, tAcc})
-        )
-    );
+    fn serialize<B: BufMut>(&self, dst: &mut B) -> Result<(), ()> {
+        if dst.remaining_mut() < Self::LEN {
+            return Err(());
+        }
+
+        let &TimeGps {
+            iTOW,
+            fTOW,
+            week,
+            leapS,
+            valid,
+            tAcc,
+        } = self;
+
+        dst.put_u32_le(iTOW);
+        dst.put_i32_le(fTOW);
+        dst.put_i16_le(week);
+        dst.put_i8(leapS);
+        dst.put_u8(valid);
+        dst.put_u32_le(tAcc);
+
+        Ok(())
+    }
+
+    fn deserialize<B: Buf>(src: &mut B) -> Result<Self, ()> {
+        if src.remaining() < Self::LEN {
+            return Err(());
+        }
+
+        let iTOW = src.get_u32_le();
+        let fTOW = src.get_i32_le();
+        let week = src.get_i16_le();
+        let leapS = src.get_i8();
+        let valid = src.get_u8();
+        let tAcc = src.get_u32_le();
+
+        Ok(TimeGps {
+            iTOW,
+            fTOW,
+            week,
+            leapS,
+            valid,
+            tAcc,
+        })
+    }
 }

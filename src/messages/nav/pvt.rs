@@ -1,6 +1,5 @@
 use crate::messages::{primitive::*, Message};
 use bitfield::bitfield;
-use nom::{do_parse, le_i16, le_i32, le_u16, le_u32, le_u8, named_attr, take};
 
 /// This message combines position, velocity and time solution,
 /// including accuracy figures. Note that during a leap second there
@@ -208,7 +207,7 @@ pub struct Pvt {
 
 bitfield! {
     /// Bitfield `valid`.
-    #[derive(Clone, Eq, PartialEq)]
+    #[derive(Clone, Copy, Eq, PartialEq)]
     pub struct Valid(X1);
     impl Debug;
     /// valid magnetic declination
@@ -226,7 +225,7 @@ bitfield! {
 
 bitfield! {
     /// Bitfield `flags`.
-    #[derive(Clone, Eq, PartialEq)]
+    #[derive(Clone, Copy, Eq, PartialEq)]
     pub struct Flags(X1);
     impl Debug;
     /// Carrier phase range solution status
@@ -248,7 +247,7 @@ bitfield! {
 
 bitfield! {
     /// Bitfield `flags2`.
-    #[derive(Clone, Eq, PartialEq)]
+    #[derive(Clone, Copy, Eq, PartialEq)]
     pub struct Flags2(X1);
     impl Debug;
     /// information about UTC Date and Time of Day validity
@@ -270,78 +269,158 @@ impl Message for Pvt {
     const CLASS: u8 = 0x01;
     const ID: u8 = 0x07;
     const LEN: usize = 92;
-}
 
-impl Pvt {
-    named_attr!(
-        #[doc = "Parses `Self` from provided buffer."],
-        pub parse<&[u8], Pvt>,
-        do_parse!(TOW: le_u32 >>
-                  year: le_u16 >>
-                  month: le_u8 >>
-                  day: le_u8 >>
-                  hour: le_u8 >>
-                  min: le_u8 >>
-                  sec: le_u8 >>
-                  valid: le_u8 >>
-                  tAcc: le_u32 >>
-                  nano: le_i32 >>
-                  fxType: le_u8 >>
-                  flags: le_u8 >>
-                  flags2: le_u8 >>
-                  numSV: le_u8 >>
-                  lon: le_i32 >>
-                  lat: le_i32 >>
-                  height: le_i32 >>
-                  hMSL: le_i32 >>
-                  hAcc: le_u32 >>
-                  vAcc: le_u32 >>
-                  velN: le_i32 >>
-                  velE: le_i32 >>
-                  velD: le_i32 >>
-                  gSpeed: le_i32 >>
-                  headMot: le_i32 >>
-                  sAcc: le_u32 >>
-                  headAcc: le_u32 >>
-                  pDOP: le_u16 >>
-                  flags3: le_u8 >>
-                  _reserved1: take!(5) >>
-                  headVeh: le_i32 >>
-                  magDec: le_i16 >>
-                  macAcc: le_u16 >>
-                  (Self{TOW,
-                        year,
-                        month,
-                        day,
-                        hour,
-                        min,
-                        sec,
-                        valid: Valid(valid),
-                        tAcc,
-                        nano,
-                        fxType,
-                        flags: Flags(flags),
-                        flags2: Flags2(flags2),
-                        numSV,
-                        lon,
-                        lat,
-                        height,
-                        hMSL,
-                        hAcc,
-                        vAcc,
-                        velN,
-                        velE,
-                        velD,
-                        gSpeed,
-                        headMot,
-                        sAcc,
-                        headAcc,
-                        pDOP,
-                        flags3,
-                        headVeh,
-                        magDec,
-                        macAcc,
-                  })
-        )
-    );
+    fn serialize<B: bytes::BufMut>(&self, dst: &mut B) -> Result<(), ()> {
+        if dst.remaining_mut() < Self::LEN {
+            return Err(());
+        }
+
+        let &Self {
+            TOW,
+            year,
+            month,
+            day,
+            hour,
+            min,
+            sec,
+            valid,
+            tAcc,
+            nano,
+            fxType,
+            flags,
+            flags2,
+            numSV,
+            lon,
+            lat,
+            height,
+            hMSL,
+            hAcc,
+            vAcc,
+            velN,
+            velE,
+            velD,
+            gSpeed,
+            headMot,
+            sAcc,
+            headAcc,
+            pDOP,
+            flags3,
+            headVeh,
+            magDec,
+            macAcc,
+        } = self;
+
+        dst.put_u32_le(TOW);
+        dst.put_u16_le(year);
+        dst.put_u8(month);
+        dst.put_u8(day);
+        dst.put_u8(hour);
+        dst.put_u8(min);
+        dst.put_u8(sec);
+        dst.put_u8(valid.0);
+        dst.put_u32_le(tAcc);
+        dst.put_i32_le(nano);
+        dst.put_u8(fxType);
+        dst.put_u8(flags.0);
+        dst.put_u8(flags2.0);
+        dst.put_u8(numSV);
+        dst.put_i32_le(lon);
+        dst.put_i32_le(lat);
+        dst.put_i32_le(height);
+        dst.put_i32_le(hMSL);
+        dst.put_u32_le(hAcc);
+        dst.put_u32_le(vAcc);
+        dst.put_i32_le(velN);
+        dst.put_i32_le(velE);
+        dst.put_i32_le(velD);
+        dst.put_i32_le(gSpeed);
+        dst.put_i32_le(headMot);
+        dst.put_u32_le(sAcc);
+        dst.put_u32_le(headAcc);
+        dst.put_u16_le(pDOP);
+        dst.put_u8(flags3);
+        // reserved1
+        dst.put_slice([0_u8; 5].as_ref());
+        dst.put_i32_le(headVeh);
+        dst.put_i16_le(magDec);
+        dst.put_u16_le(macAcc);
+
+        Ok(())
+    }
+
+    fn deserialize<B: bytes::Buf>(src: &mut B) -> Result<Self, ()> {
+        if src.remaining() < Self::LEN {
+            return Err(());
+        }
+
+        let TOW = src.get_u32_le();
+        let year = src.get_u16_le();
+        let month = src.get_u8();
+        let day = src.get_u8();
+        let hour = src.get_u8();
+        let min = src.get_u8();
+        let sec = src.get_u8();
+        let valid = Valid(src.get_u8());
+        let tAcc = src.get_u32_le();
+        let nano = src.get_i32_le();
+        let fxType = src.get_u8();
+        let flags = Flags(src.get_u8());
+        let flags2 = Flags2(src.get_u8());
+        let numSV = src.get_u8();
+        let lon = src.get_i32_le();
+        let lat = src.get_i32_le();
+        let height = src.get_i32_le();
+        let hMSL = src.get_i32_le();
+        let hAcc = src.get_u32_le();
+        let vAcc = src.get_u32_le();
+        let velN = src.get_i32_le();
+        let velE = src.get_i32_le();
+        let velD = src.get_i32_le();
+        let gSpeed = src.get_i32_le();
+        let headMot = src.get_i32_le();
+        let sAcc = src.get_u32_le();
+        let headAcc = src.get_u32_le();
+        let pDOP = src.get_u16_le();
+        let flags3 = src.get_u8();
+        // reserved1
+        src.advance(5);
+        let headVeh = src.get_i32_le();
+        let magDec = src.get_i16_le();
+        let macAcc = src.get_u16_le();
+
+        Ok(Self {
+            TOW,
+            year,
+            month,
+            day,
+            hour,
+            min,
+            sec,
+            valid,
+            tAcc,
+            nano,
+            fxType,
+            flags,
+            flags2,
+            numSV,
+            lon,
+            lat,
+            height,
+            hMSL,
+            hAcc,
+            vAcc,
+            velN,
+            velE,
+            velD,
+            gSpeed,
+            headMot,
+            sAcc,
+            headAcc,
+            pDOP,
+            flags3,
+            headVeh,
+            magDec,
+            macAcc,
+        })
+    }
 }

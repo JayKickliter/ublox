@@ -32,7 +32,7 @@ impl Msg {
 }
 
 /// Represents any u-blox protocol message.
-pub trait Message {
+pub trait Message: Sized {
     /// Message Class.
     const CLASS: u8;
     /// Message ID.
@@ -40,8 +40,9 @@ pub trait Message {
     /// Message length.
     const LEN: usize;
 
-    /// Encode message bytes to a buffer.
-    fn to_bytes(&self, _buf: &mut [u8]) -> Result<(), ()> {
-        unimplemented!()
-    }
+    /// Serialize message bytes to a buffer.
+    fn serialize<B: bytes::BufMut>(&self, dst: &mut B) -> Result<(), ()>;
+
+    /// Deserialize a message from buffer of a bytes.
+    fn deserialize<B: bytes::Buf>(src: &mut B) -> Result<Self, ()>;
 }

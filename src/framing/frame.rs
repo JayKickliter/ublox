@@ -55,29 +55,29 @@ impl Frame {
 }
 
 /// Frame a u-blox message to a buffer.
-pub fn frame<M: Message>(msg: &M, buf: &mut [u8]) -> Result<usize, ()> {
+pub fn frame<M: Message>(msg: &M, dst: &mut [u8]) -> Result<usize, ()> {
     const FRAME_OVERHEAD: usize = 8;
-    if buf.len() < (FRAME_OVERHEAD + M::LEN) {
+    if dst.len() < (FRAME_OVERHEAD + M::LEN) {
         return Err(());
     }
-    let buf = &mut buf[..M::LEN + FRAME_OVERHEAD];
+    let dst = &mut dst[..M::LEN + FRAME_OVERHEAD];
     // Prelude
     {
         let [len_lsb, len_msb] = (M::LEN as u16).to_le_bytes();
-        buf[..6].clone_from_slice(&[0xB5, 0x62, M::CLASS, M::ID, len_lsb, len_msb]);
+        dst[..6].clone_from_slice(&[0xB5, 0x62, M::CLASS, M::ID, len_lsb, len_msb]);
     }
     // Mesage body.
-    msg.to_bytes(buf[6..(M::LEN + 6)].as_mut())?;
+    msg.serialize(&mut dst[6..(M::LEN + 6)].as_mut())?;
     // Append checksum.
     {
         let mut cksm = Checksum::default();
         // The checksum is calculated from class to end of message, hence
         // `skip(2)`
-        for b in buf[2..buf.len() - 2].iter() {
+        for b in dst[2..dst.len() - 2].iter() {
             cksm.push(*b);
         }
         let (ck_a, ck_b) = cksm.take();
-        buf[M::LEN + 6..].clone_from_slice(&[ck_a, ck_b]);
+        dst[M::LEN + 6..].clone_from_slice(&[ck_a, ck_b]);
     }
     Ok(M::LEN + FRAME_OVERHEAD)
 }
