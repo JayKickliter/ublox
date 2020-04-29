@@ -1,6 +1,5 @@
 use crate::error::Result;
 use i2c_linux::{I2c, Message as I2cMessage, ReadFlags, WriteFlags};
-use log;
 use std::thread;
 use std::{fmt::Debug, fs::File, path::Path, time::Duration};
 use sysfs_gpio as gpio;
