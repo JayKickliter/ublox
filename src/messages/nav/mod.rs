@@ -6,7 +6,6 @@ pub use self::pvt::*;
 pub use self::timegps::*;
 use crate::framing::Frame;
 use crate::messages::Message;
-use nom::{alt, do_parse, named_attr, tag};
 
 /// Navigation Results Messages
 ///
@@ -36,35 +35,13 @@ impl Nav {
         };
 
         match (frame.class, frame.id, frame.message.len()) {
-            (TimeGps::CLASS, TimeGps::ID, TimeGps::LEN) => Ok(Nav::TimeGps(
-                TimeGps::parse(&frame.message).map_err(|_| ())?.1,
-            )),
+            (TimeGps::CLASS, TimeGps::ID, TimeGps::LEN) => Ok(Nav::TimeGps(TimeGps::deserialize(
+                &mut frame.message.as_slice(),
+            )?)),
             (Pvt::CLASS, Pvt::ID, Pvt::LEN) => {
-                Ok(Nav::Pvt(Pvt::parse(&frame.message).map_err(|_| ())?.1))
+                Ok(Nav::Pvt(Pvt::deserialize(&mut frame.message.as_slice())?))
             }
             _ => Err(()),
         }
-    }
-}
-
-named_attr!(
-    #[allow(missing_docs)],
-    pub navmsg<&[u8], Nav>,
-    do_parse!(tag!([0x01]) >>
-              navmsg: alt!(
-                  TimeGps::parse => { | msg | Nav::TimeGps(msg) }
-              ) >>
-              (navmsg)
-    )
-);
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_nav_timegps() {
-        let msg = vec![0x01, 0x20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-        navmsg(&msg).unwrap();
     }
 }

@@ -12,4 +12,4 @@ pub use frame::{frame, Frame};
 
 /// TODO: add `std` feature and use `heapless::Vec<u8,
 /// heapless::consts::U128>` when not `std` feature is not enabled.
-pub type FrameVec = Vec<u8>;
+pub type FrameVec = ::alloc::vec::Vec<u8>;

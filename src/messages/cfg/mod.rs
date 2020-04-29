@@ -31,7 +31,7 @@ impl Cfg {
 
         match (frame.class, frame.id, frame.message.len()) {
             (msg::SetMsgRates::CLASS, msg::SetMsgRates::ID, msg::SetMsgRates::LEN) => Ok(
-                Cfg::SetMsgRates(msg::SetMsgRates::parse(frame.message.as_ref())?),
+                Cfg::SetMsgRates(msg::SetMsgRates::deserialize(&mut frame.message.as_ref())?),
             ),
             _ => Err(()),
         }

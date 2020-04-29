@@ -10,10 +10,5 @@ default-members = [ "ubsniff" ]
 
 [dependencies]
 bitfield = "0.13.2"
+bytes = { version = "0.5.4", default-features = false }
 log = "0.4.8"
-nom = "4"
-zerocopy = "0.3.0"
-
-[dependencies.byteorder]
-version = "1"
-default-features = true

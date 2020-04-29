@@ -87,11 +87,10 @@ impl Message for Prt {
     const ID: u8 = 0x00;
     const LEN: usize = 20;
 
-    fn to_bytes(&self, dst: &mut [u8]) -> Result<(), ()> {
-        use byteorder::{WriteBytesExt, LE};
-        use std::io::Cursor;
-
-        let mut csr = Cursor::new(dst);
+    fn serialize<B: bytes::BufMut>(&self, dst: &mut B) -> Result<(), ()> {
+        if dst.remaining_mut() < Self::LEN {
+            return Err(());
+        };
 
         match self {
             Prt::Uart {
@@ -102,17 +101,17 @@ impl Message for Prt {
                 out_proto_mask,
                 flags,
             } => {
-                csr.write_u8(Self::UART_PORT).map_err(|_| ())?;
+                dst.put_u8(Self::UART_PORT);
                 // reserved 1
-                csr.write_u8(0).map_err(|_| ())?;
-                csr.write_u16::<LE>(tx_ready.0).map_err(|_| ())?;
-                csr.write_u32::<LE>(mode.0).map_err(|_| ())?;
-                csr.write_u32::<LE>(*baud_rate).map_err(|_| ())?;
-                csr.write_u16::<LE>(in_proto_mask.0).map_err(|_| ())?;
-                csr.write_u16::<LE>(out_proto_mask.0).map_err(|_| ())?;
-                csr.write_u16::<LE>(flags.0).map_err(|_| ())?;
+                dst.put_u8(0);
+                dst.put_u16_le(tx_ready.0);
+                dst.put_u32_le(mode.0);
+                dst.put_u32_le(*baud_rate);
+                dst.put_u16_le(in_proto_mask.0);
+                dst.put_u16_le(out_proto_mask.0);
+                dst.put_u16_le(flags.0);
                 // reserved2
-                csr.write_u16::<LE>(0).map_err(|_| ())?;
+                dst.put_u16_le(0);
             }
             Prt::I2c {
                 tx_ready,
@@ -121,18 +120,18 @@ impl Message for Prt {
                 out_proto_mask,
                 flags,
             } => {
-                csr.write_u8(Self::I2C_PORT).map_err(|_| ())?;
+                dst.put_u8(Self::I2C_PORT);
                 // reserved 1
-                csr.write_u8(0).map_err(|_| ())?;
-                csr.write_u16::<LE>(tx_ready.0).map_err(|_| ())?;
-                csr.write_u32::<LE>(mode.0).map_err(|_| ())?;
+                dst.put_u8(0);
+                dst.put_u16_le(tx_ready.0);
+                dst.put_u32_le(mode.0);
                 // reserved2
-                csr.write_u32::<LE>(0).map_err(|_| ())?;
-                csr.write_u16::<LE>(in_proto_mask.0).map_err(|_| ())?;
-                csr.write_u16::<LE>(out_proto_mask.0).map_err(|_| ())?;
-                csr.write_u16::<LE>(flags.0).map_err(|_| ())?;
+                dst.put_u32_le(0);
+                dst.put_u16_le(in_proto_mask.0);
+                dst.put_u16_le(out_proto_mask.0);
+                dst.put_u16_le(flags.0);
                 // reserved3
-                csr.write_u16::<LE>(0).map_err(|_| ())?;
+                dst.put_u16_le(0);
             }
             Prt::Spi {
                 tx_ready,
@@ -141,22 +140,91 @@ impl Message for Prt {
                 out_proto_mask,
                 flags,
             } => {
-                csr.write_u8(Self::SPI_PORT).map_err(|_| ())?;
+                dst.put_u8(Self::SPI_PORT);
                 // reserved 1
-                csr.write_u8(0).map_err(|_| ())?;
-                csr.write_u16::<LE>(tx_ready.0).map_err(|_| ())?;
-                csr.write_u32::<LE>(mode.0).map_err(|_| ())?;
+                dst.put_u8(0);
+                dst.put_u16_le(tx_ready.0);
+                dst.put_u32_le(mode.0);
                 // reserved2
-                csr.write_u32::<LE>(0).map_err(|_| ())?;
-                csr.write_u16::<LE>(in_proto_mask.0).map_err(|_| ())?;
-                csr.write_u16::<LE>(out_proto_mask.0).map_err(|_| ())?;
-                csr.write_u16::<LE>(flags.0).map_err(|_| ())?;
+                dst.put_u32_le(0);
+                dst.put_u16_le(in_proto_mask.0);
+                dst.put_u16_le(out_proto_mask.0);
+                dst.put_u16_le(flags.0);
                 // reserved3
-                csr.write_u16::<LE>(0).map_err(|_| ())?;
+                dst.put_u16_le(0);
             }
         }
-        assert_eq!(csr.position() as usize, Self::LEN);
         Ok(())
+    }
+
+    fn deserialize<B: bytes::Buf>(src: &mut B) -> Result<Self, ()> {
+        if src.remaining() < Self::LEN {
+            return Err(());
+        }
+
+        match src.get_u8() {
+            Self::UART_PORT => {
+                // reserved 1
+                let _ = src.get_u8();
+                let tx_ready = TxReady(src.get_u16_le());
+                let mode = UartMode(src.get_u32_le());
+                let baud_rate = src.get_u32_le();
+                let in_proto_mask = InProtoMask(src.get_u16_le());
+                let out_proto_mask = OutProtoMask(src.get_u16_le());
+                let flags = Flags(src.get_u16_le());
+                // reserved2
+                let _ = src.get_u16_le();
+                Ok(Self::Uart {
+                    tx_ready,
+                    mode,
+                    baud_rate,
+                    in_proto_mask,
+                    out_proto_mask,
+                    flags,
+                })
+            }
+            Self::I2C_PORT => {
+                // reserved 1
+                let _ = src.get_u8();
+                let tx_ready = TxReady(src.get_u16_le());
+                let mode = I2cMode(src.get_u32_le());
+                // reserved2
+                let _ = src.get_u32_le();
+                let in_proto_mask = InProtoMask(src.get_u16_le());
+                let out_proto_mask = OutProtoMask(src.get_u16_le());
+                let flags = Flags(src.get_u16_le());
+                // reserved3
+                let _ = src.get_u16_le();
+                Ok(Self::I2c {
+                    tx_ready,
+                    mode,
+                    in_proto_mask,
+                    out_proto_mask,
+                    flags,
+                })
+            }
+            Self::SPI_PORT => {
+                // reserved 1
+                let _ = src.get_u8();
+                let tx_ready = TxReady(src.get_u16_le());
+                let mode = SpiMode(src.get_u32_le());
+                // reserved2
+                let _ = src.get_u32_le();
+                let in_proto_mask = InProtoMask(src.get_u16_le());
+                let out_proto_mask = OutProtoMask(src.get_u16_le());
+                let flags = Flags(src.get_u16_le());
+                // reserved3
+                let _ = src.get_u16_le();
+                Ok(Self::Spi {
+                    tx_ready,
+                    mode,
+                    in_proto_mask,
+                    out_proto_mask,
+                    flags,
+                })
+            }
+            _ => Err(()),
+        }
     }
 }
 

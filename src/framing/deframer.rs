@@ -113,8 +113,8 @@ impl Deframer {
             } => {
                 trace!("ck_a {:#04x} ← mesg", input);
                 if input == cksum_calc.0 {
-                    let mut msg = Vec::new();
-                    ::std::mem::swap(message, &mut msg);
+                    let mut msg = ::alloc::vec::Vec::new();
+                    ::core::mem::swap(message, &mut msg);
                     *self = CkB {
                         class: *class,
                         id: *id,
@@ -137,8 +137,8 @@ impl Deframer {
                 cksum_calc,
             } => {
                 trace!("ck_b {:#04x} ← ck_a", input);
-                let mut msg = Vec::new();
-                ::std::mem::swap(message, &mut msg);
+                let mut msg = ::alloc::vec::Vec::new();
+                ::core::mem::swap(message, &mut msg);
                 let ret = if input == cksum_calc.1 {
                     Some(Frame {
                         class: *class,

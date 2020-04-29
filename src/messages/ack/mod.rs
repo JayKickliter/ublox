@@ -6,7 +6,6 @@
 
 use crate::framing::Frame;
 use crate::messages::Message;
-use zerocopy::{AsBytes, ByteSlice, FromBytes, LayoutVerified, Unaligned};
 
 /// Ack/Nak.
 #[allow(missing_docs)]
@@ -27,8 +26,12 @@ impl AckNak {
         };
 
         match (frame.class, frame.id, frame.message.len()) {
-            (Ack::CLASS, Ack::ID, Ack::LEN) => Ok(AckNak::Ack(Ack::parse(frame.message.as_ref())?)),
-            (Nak::CLASS, Nak::ID, Nak::LEN) => Ok(AckNak::Nak(Nak::parse(frame.message.as_ref())?)),
+            (Ack::CLASS, Ack::ID, Ack::LEN) => {
+                Ok(AckNak::Ack(Ack::deserialize(&mut frame.message.as_ref())?))
+            }
+            (Nak::CLASS, Nak::ID, Nak::LEN) => {
+                Ok(AckNak::Nak(Nak::deserialize(&mut frame.message.as_ref())?))
+            }
             _ => Err(()),
         }
     }
@@ -37,51 +40,75 @@ impl AckNak {
 /// Output upon processing of an input message.
 ///
 /// A UBX-ACK-ACK is sent as soon as possible but at least within one second.
-#[repr(C)]
-#[derive(AsBytes, Clone, Debug, Eq, FromBytes, PartialEq, Unaligned)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Ack {
-    class: u8,
-    id: u8,
-}
-
-impl Ack {
-    /// Parses `Self` from provided buffer.
-    pub fn parse<B>(bytes: B) -> Result<Self, ()>
-    where
-        B: ByteSlice,
-    {
-        Ok(LayoutVerified::<B, Self>::new(bytes).ok_or(())?.clone())
-    }
+    /// Acknowledged message's class.
+    pub class: u8,
+    /// Acknowledged message's ID.
+    pub id: u8,
 }
 
 impl Message for Ack {
     const CLASS: u8 = 0x05;
     const ID: u8 = 0x01;
     const LEN: usize = 2;
+
+    fn serialize<B: bytes::BufMut>(&self, dst: &mut B) -> Result<(), ()> {
+        if dst.remaining_mut() < Self::LEN {
+            return Err(());
+        }
+
+        dst.put_u8(self.class);
+        dst.put_u8(self.id);
+
+        Ok(())
+    }
+
+    fn deserialize<B: bytes::Buf>(src: &mut B) -> Result<Self, ()> {
+        if src.remaining() < Self::LEN {
+            return Err(());
+        }
+
+        let class = src.get_u8();
+        let id = src.get_u8();
+
+        Ok(Self { class, id })
+    }
 }
 
 /// Output upon processing of an input message.
 ///
 /// A UBX-ACK-NAK is sent as soon as possible but at least within one second.
-#[repr(C)]
-#[derive(AsBytes, Clone, Debug, Eq, FromBytes, PartialEq, Unaligned)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Nak {
     class: u8,
     id: u8,
-}
-
-impl Nak {
-    /// Parses `Self` from provided buffer.
-    pub fn parse<B>(bytes: B) -> Result<Self, ()>
-    where
-        B: ByteSlice,
-    {
-        Ok(LayoutVerified::<B, Self>::new(bytes).ok_or(())?.clone())
-    }
 }
 
 impl Message for Nak {
     const CLASS: u8 = 0x05;
     const ID: u8 = 0x00;
     const LEN: usize = 2;
+
+    fn serialize<B: bytes::BufMut>(&self, dst: &mut B) -> Result<(), ()> {
+        if dst.remaining_mut() < Self::LEN {
+            return Err(());
+        }
+
+        dst.put_u8(self.class);
+        dst.put_u8(self.id);
+
+        Ok(())
+    }
+
+    fn deserialize<B: bytes::Buf>(src: &mut B) -> Result<Self, ()> {
+        if src.remaining() < Self::LEN {
+            return Err(());
+        }
+
+        let class = src.get_u8();
+        let id = src.get_u8();
+
+        Ok(Self { class, id })
+    }
 }
