@@ -18,9 +18,12 @@
 ///     cksum.push(*b);
 /// }
 /// let (ck_a, ck_b) = cksum.take();
+/// // calling take again should return (0, 0) since we haven't pushed
+/// // any more bytes
+/// assert_eq!((0, 0), cksum.take());
 /// ```
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Checksum(Option<(u8, u8)>);
+pub struct Checksum((u8, u8));
 
 impl Checksum {
     /// Returns a new instance of `Self`.
@@ -40,16 +43,21 @@ impl Checksum {
     }
 
     /// Update the running checksum with a received byte.
+    ///
+    /// Importantly, it also returns the original `input` value. This
+    /// allows you to maintain a running checksum while still using
+    /// the input value for.
     #[inline]
     pub fn push(&mut self, input: u8) -> u8 {
-        let (ck_a, ck_b) = self.0.get_or_insert((0, 0));
+        let (ck_a, ck_b) = &mut self.0;
         *ck_a = ck_a.wrapping_add(input);
         *ck_b = ck_b.wrapping_add(*ck_a);
         input
     }
 
-    /// Returns the running checksum, `(ck_a, ck_b)`, and resets `self` to default state.
+    /// Returns the running checksum, `(ck_a, ck_b)`, and resets
+    /// `self` to default state.
     pub fn take(&mut self) -> (u8, u8) {
-        self.0.take().unwrap_or((0, 0))
+        ::core::mem::take(&mut self.0)
     }
 }
